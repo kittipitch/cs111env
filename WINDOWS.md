@@ -79,11 +79,18 @@ Make Sublime Text use 4 spaces for Python:
 Download and install fonts with glyphs:
 <https://github.com/microsoft/cascadia-code/releases/download/v2404.23/CascadiaCode-2404.23.zip>
 
+1. Extract the downloaded `.zip` file.
+2. Select all the font files (`.ttf`).
+3. Right-click and choose **Install** (or **Install for all users**).
+
 <img src="images/windows/img51_win_cascadia_font.png" alt="Cascadia Font" width="600">
 
 ### 5. Install Git for Windows
 
-<https://gitforwindows.org/>
+Download from: <https://gitforwindows.org/>
+
+- Run the downloaded installer.
+- You can safely click **Next** through all the prompts to use the default settings and finish the installation.
 
 ### 6. Install KDiff3
 
@@ -323,10 +330,19 @@ cd
 python3 --version
 ```
 
-### 13. Upgrade pip
+### 13. Upgrade pip and other package managers
+
+Upgrade `pip`:
 
 ```bash
 python3 -m pip install --upgrade pip
+```
+
+*(Optional)* Install `pipx` and `uv` (a much faster Python package manager) for future use:
+
+```bash
+sudo apt install -y pipx
+pipx install uv
 ```
 
 ### 14. Install Base16 color scheme
@@ -387,9 +403,11 @@ sudo apt update && sudo apt install -y mypy
 
 #### 16.3 Create the WSL bridge script
 
-SublimeLinter runs as a Windows process and calls the linter with Windows paths (e.g. `D:\project\foo.py`). Since mypy lives in WSL, we need a `.bat` wrapper that converts Windows paths to WSL paths before invoking mypy.
+SublimeLinter runs as a Windows process and calls the linter with Windows paths (e.g. `C:\project\foo.py` or `D:\project\foo.py`). Since mypy lives in WSL, we need a `.bat` wrapper that converts Windows paths to WSL paths before invoking mypy.
 
-Create a folder for the script (e.g. `D:\bin\`) and save this as `mypy-wsl.bat`:
+Create a folder for the script (e.g. `C:\bin\` or `D:\bin\`) and save this as `mypy-wsl.bat`:
+
+> **Note:** While placing files in the `C:\` drive is fine (as every PC has it), files here are easily lost if Windows is reinstalled. It is highly recommended to store your code, scripts, and personal files (like Desktop/Documents) on a secondary drive like `D:\` if available.
 
 ```bat
 @echo off
@@ -430,14 +448,14 @@ Go to **Preferences → Package Settings → SublimeLinter → Settings** and ad
   "linters": {
     "mypy": {
       "disable": false,
-      "executable": ["D:\\bin\\mypy-wsl.bat"],
+      "executable": ["C:\\bin\\mypy-wsl.bat"],
       "args": ["--ignore-missing-imports"]
     }
   }
 }
 ```
 
-> **Note:** Adjust the path to wherever you saved `mypy-wsl.bat`. Use double backslashes (`\\`) in JSON.
+> **Note:** Adjust the path `C:\\bin\\mypy-wsl.bat` to wherever you saved `mypy-wsl.bat` (e.g. `D:\\bin\\mypy-wsl.bat`). Use double backslashes (`\\`) in JSON.
 
 #### 16.5 Verify it works
 
