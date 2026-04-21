@@ -90,11 +90,17 @@ git clone -q https://github.com/tinted-theming/tinted-shell.git "$HOME"/.config/
 echo "==> Checking Python..."
 python3 --version
 
-echo "==> Upgrading pip..."
-python3 -m pip install --upgrade pip
+echo "==> Installing uv"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+if [ ! -d "$HOME/.venv" ]; then
+    uv venv ~/.venv
+else
+    echo "Environment already exists! Moving on..."
+fi
 
 echo "==> Installing NumPy and Pandas..."
-pip install numpy pandas 2>/dev/null || sudo pip3 install numpy pandas
+uv pip install numpy pandas --python ~/.venv
 
 # ============================================================
 # Sublime Text (UBUNTU.md Step 9)
