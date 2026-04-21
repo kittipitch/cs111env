@@ -90,11 +90,12 @@ git clone -q https://github.com/tinted-theming/tinted-shell.git "$HOME"/.config/
 echo "==> Checking Python..."
 python3 --version
 
-echo "==> Upgrading pip..."
-python3 -m pip install --upgrade pip
+# echo "==> Upgrading pip..."
+# python3 -m pip install --upgrade pip
 
 echo "==> Installing NumPy and Pandas..."
-pip install numpy pandas 2>/dev/null || sudo pip3 install numpy pandas
+sudo apt install -y python3-pandas python3-numpy
+# pip install numpy pandas 2>/dev/null || sudo pip3 install numpy pandas
 
 # ============================================================
 # Sublime Text (UBUNTU.md Step 9)
