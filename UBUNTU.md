@@ -249,7 +249,12 @@ Terminus provides an integrated terminal within Sublime Text.
 
 <img src="images/common/img10_common_sublime_install_terminus.png" alt="Terminus 2" width="600">
 
-#### 14.4 Configure Terminus
+#### 14.4 Satisfy Dependencies
+
+- **Ctrl + Shift + P**
+- Type "**Package Control: Satisfy Dependencies**" and hit Enter
+
+#### 14.5 Configure Terminus
 
 - Go to **Preferences → Package Settings → Terminus → Settings**
 
@@ -269,7 +274,7 @@ Terminus provides an integrated terminal within Sublime Text.
 }
 ```
 
-#### 14.5 Set keyboard shortcuts
+#### 14.6 Set keyboard shortcuts
 
 - Go to **Preferences → Key Bindings**
 
@@ -292,7 +297,7 @@ Terminus provides an integrated terminal within Sublime Text.
 ]
 ```
 
-#### 14.6 Ubuntu only - disable conflicting shortcut
+#### 14.7 Ubuntu only - disable conflicting shortcut
 
 This command ensures the OS doesn't intercept **Alt + `** (which is normally used to switch between windows of the same application).
 
@@ -300,7 +305,7 @@ This command ensures the OS doesn't intercept **Alt + `** (which is normally use
 gsettings set org.gnome.desktop.wm.keybindings switch-group "['<Super>Above_Tab']"
 ```
 
-#### 14.7 Restart Sublime Text
+#### 14.8 Restart Sublime Text
 
 Now you can use **Alt + `** to open a bash terminal in Sublime Text.
 

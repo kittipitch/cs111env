@@ -498,7 +498,12 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
 
 <img src="images/common/img10_common_sublime_install_terminus.png" alt="Terminus 2" width="600">
 
-#### 17.4 Configure WSL
+#### 17.4 Satisfy Dependencies
+
+- **Ctrl + Shift + P**
+- Type "**Package Control: Satisfy Dependencies**" and hit Enter
+
+#### 17.5 Configure WSL
 
 - Go to **Preferences → Package Settings → Terminus → Settings**
 
@@ -528,7 +533,7 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
 }
 ```
 
-#### 17.5 Set keyboard shortcuts
+#### 17.6 Set keyboard shortcuts
 
 - Go to **Preferences → Key Bindings**
 
@@ -550,7 +555,7 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
 ]
 ```
 
-#### 17.6 Restart Sublime Text
+#### 17.7 Restart Sublime Text
 
 Now you can use **Alt + `** to open a bash terminal in Sublime Text.
 

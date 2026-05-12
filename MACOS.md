@@ -287,7 +287,12 @@ Terminus provides an integrated terminal within Sublime Text.
 
 <img src="images/common/img05_common_sublime_install_package_control.png" alt="Terminus 1" width="600">
 
-#### 14.4 Configure Terminus
+#### 14.4 Satisfy Dependencies
+
+- **Ctrl + Shift + P**
+- Type "**Package Control: Satisfy Dependencies**" and hit Enter
+
+#### 14.5 Configure Terminus
 
 - Go to **Settings... → Package Settings → Terminus → Settings**
 
@@ -309,7 +314,7 @@ Terminus provides an integrated terminal within Sublime Text.
 }
 ```
 
-#### 14.5 Set keyboard shortcuts
+#### 14.6 Set keyboard shortcuts
 
 - Go to **Settings... → Key Bindings**
 
@@ -332,7 +337,7 @@ Terminus provides an integrated terminal within Sublime Text.
 ]
 ```
 
-#### 14.6 Restart Sublime Text
+#### 14.7 Restart Sublime Text
 
 Now you can use **Alt + `** to open a zsh terminal in Sublime Text.
 
