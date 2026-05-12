@@ -522,7 +522,7 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
             "cwd": "${project_path:${folder}}",
             "env": {},
             "enable": true,
-            "default": false
+            "default": true
         }
     ]
 }
@@ -544,8 +544,7 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
     "keys": ["alt+`"],
     "command": "toggle_terminus_panel",
     "args": {
-      "config_name": "WSL",
-      "cwd": "${file_path:${folder}}"
+      "config_name": "WSL"
     }
   }
 ]
