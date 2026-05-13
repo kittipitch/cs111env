@@ -1,6 +1,6 @@
 # Windows + WSL Setup Guide
 
-Complete setup for Windows using Sublime Text with WSL (Ubuntu 24.04) backend.
+This guide sets up Windows, Sublime Text, and WSL with Ubuntu 24.04.
 
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
@@ -25,9 +25,11 @@ Complete setup for Windows using Sublime Text with WSL (Ubuntu 24.04) backend.
 
 Change to **Win + Space bar** (or anything else). **DO NOT use 'Grave Accent'** to switch languages.
 
-Also **remove all python installations from your system** before proceeding.
+Also **remove all Python installations from your system** before you continue.
 
 ### 2. Install Sublime Text 4
+
+Sublime Text is the editor used in this guide. Adding it to the Windows Path lets you open it from the terminal.
 
 - Download from [here](https://www.sublimetext.com/download)
 - Choose `win-x64` for Windows
@@ -88,6 +90,8 @@ Download and install fonts with glyphs:
 
 ### 5. Install Git for Windows
 
+Git is used to download code and submit work for many programming classes.
+
 Download from: <https://gitforwindows.org/>
 
 - Run the downloaded installer.
@@ -95,9 +99,11 @@ Download from: <https://gitforwindows.org/>
 
 ### 6. Install KDiff3
 
+KDiff3 helps you compare files and fix merge conflicts.
+
 Install KDiff3 1.11.0: <https://download.kde.org/stable/kdiff3/>
 
-Include `"C:\Program Files\KDiff3\"` and `"C:\Program Files\KDiff3\bin"` in Windows path (see Step 2).
+Add `"C:\Program Files\KDiff3\"` and `"C:\Program Files\KDiff3\bin"` to the Windows Path (see Step 2).
 
 ---
 
@@ -105,7 +111,9 @@ Include `"C:\Program Files\KDiff3\"` and `"C:\Program Files\KDiff3\bin"` in Wind
 
 ### 7. Installing WSL - Ubuntu 24.04
 
-#### 7.1 Open PowerShell with administrator privilege
+WSL lets you run Ubuntu inside Windows. We use it because the course tools work best in a Linux environment.
+
+#### 7.1 Open PowerShell as Administrator
 
 1. Win + R
 2. Type "powershell"
@@ -138,7 +146,7 @@ dism.exe /online /enable-feature `
 
 <img src="images/windows/img25_win_features_on_2.png" alt="Features on 2" width="600">
 
-#### 7.3 Download and install Linux kernel update
+#### 7.3 Download and install the Linux kernel update
 
 WSL2 Linux kernel update package for x64 machines
 
@@ -174,9 +182,11 @@ wsl --install -d Ubuntu-24.04
 
 #### 7.5 Ubuntu Configuration
 
-**Pick a username and password** (password won't display on screen)
+**Pick a username and password**. The password will not show on screen while you type.
 
 **Link Windows' Documents folder to Ubuntu:**
+
+This makes your Windows folders easy to reach from Ubuntu.
 
 ```bash
 # Bash/WSL
@@ -223,12 +233,16 @@ sudo ln -s /mnt/d/home/$(whoami) /home/
 
 **Update and upgrade:**
 
+This updates Ubuntu before we install programming tools.
+
 ```bash
 # Bash/WSL
 sudo apt update; sudo apt upgrade -y
 ```
 
 **Fix permissions:**
+
+This makes files on Windows drives behave more like normal Linux files.
 
 ```bash
 # Bash/WSL
@@ -246,6 +260,15 @@ options="metadata,uid=1000,gid=1000,umask=077"
 ```
 
 <img src="images/nix/img22_nix_wsl_conf.png" alt="wsl conf" width="600">
+
+Restart WSL so this setting is used:
+
+```powershell
+# PowerShell
+wsl --shutdown
+```
+
+Then open Ubuntu again.
 
 **Limit WSL resources:**
 
@@ -272,9 +295,9 @@ wsl -l -v
 
 ### 8. Microsoft Defender Exclusions
 
-Reduced "Antimalware Service Executable" (MsMpEng.exe) overhead by ignoring high-activity WSL-related directories and processes.
+This step can make WSL faster. It tells Microsoft Defender to ignore busy WSL files and processes.
 
-#### 8.1 Open PowerShell with administrator privilege
+#### 8.1 Open PowerShell as Administrator
 
 1. Win + R
 2. Type "powershell"
@@ -283,7 +306,7 @@ Reduced "Antimalware Service Executable" (MsMpEng.exe) overhead by ignoring high
 
 #### 8.2 Add Exclusions
 
-Run the following commands in PowerShell to exclude WSL network paths and core processes:
+Run these commands in PowerShell:
 
 ```powershell
 # PowerShell (Admin)
@@ -294,7 +317,7 @@ Add-MpPreference -ExclusionProcess "wsl.exe"
 Add-MpPreference -ExclusionProcess "wslhost.exe"
 ```
 
-To exclude the virtual disk (.vhdx) folder (replace `[USER]` with your Windows username):
+Also exclude the Ubuntu disk folder. Replace `[USER]` with your Windows username:
 
 ```powershell
 # PowerShell (Admin)
@@ -306,6 +329,8 @@ Add-MpPreference -ExclusionPath "C:\Users\[USER]\AppData\Local\Packages\Canonica
 ## Windows Terminal
 
 ### 9. Installing Windows Terminal
+
+Windows Terminal gives you a better terminal for Ubuntu than the default console.
 
 - Download: <https://aka.ms/terminal>
 - Set Default Profile to "Ubuntu-24.04"
@@ -325,12 +350,16 @@ Add-MpPreference -ExclusionPath "C:\Users\[USER]\AppData\Local\Packages\Canonica
 
 ### 10. Install basic tools
 
+These are common tools used by Python, Haskell, and command-line programs.
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx tmux byobu mypy dos2unix emacs-nox vim neovim bat wget curl gnupg ca-certificates
 ```
 
 ### 11. Install basic dot files
+
+These settings make the terminal easier to use in this course.
 
 ```bash
 git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
@@ -354,7 +383,8 @@ python3 --version
 
 ### 13. Install uv
 
-`uv` is an extremely fast Python package manager that replaces `pip`.
+`uv` is a fast Python package manager.
+It helps install Python packages quickly and safely.
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -387,7 +417,7 @@ python3 hello.py
 
 ### 16. Installing and Configuring mypy via WSL
 
-Static type checking for Python ensures your code is bug-free before you run it.
+Static type checking helps find Python mistakes before you run the program.
 
 #### 16.1 Verify mypy installation
 
@@ -398,7 +428,7 @@ Static type checking for Python ensures your code is bug-free before you run it.
 mypy --version
 ```
 
-If it shows a version (e.g. `mypy 1.8.0`), proceed to the next step. Otherwise, install it now:
+If it shows a version, go to the next step. If not, install it now:
 
 ```bash
 # Bash/WSL
@@ -406,6 +436,8 @@ sudo apt update && sudo apt install -y mypy
 ```
 
 #### 16.2 Install SublimeLinter and SublimeLinter-mypy
+
+SublimeLinter shows Python type errors inside Sublime Text.
 
 1. **Ctrl + Shift + P** → "Package Control: Install Package"
 <img src="images/common/img05_common_sublime_install_package_control.png" alt="Sublime Linter 1" width="600">
@@ -419,11 +451,11 @@ sudo apt update && sudo apt install -y mypy
 
 #### 16.3 Create the WSL bridge script
 
-SublimeLinter runs as a Windows process and calls the linter with Windows paths (e.g. `C:\project\foo.py` or `D:\project\foo.py`). Since mypy lives in WSL, we need a `.bat` wrapper that converts Windows paths to WSL paths before invoking mypy.
+SublimeLinter runs on Windows. It sends Windows paths such as `C:\project\foo.py` or `D:\project\foo.py`. But `mypy` runs inside WSL. This `.bat` file changes Windows paths into WSL paths before it runs `mypy`.
 
 Create a folder for the script (e.g. `C:\bin\` or `D:\bin\`) and save this as `mypy-wsl.bat`:
 
-> **Note:** While placing files in the `C:\` drive is fine (as every PC has it), files here are easily lost if Windows is reinstalled. It is highly recommended to store your code, scripts, and personal files (like Desktop/Documents) on a secondary drive like `D:\` if available.
+> **Note:** It is OK to put this file on the `C:\` drive. But if Windows is reinstalled, files on `C:\` may be lost. If you have a `D:\` drive, it is safer to keep your code and scripts there.
 
 ```bat
 @echo off
@@ -449,7 +481,7 @@ wsl mypy %final_args%
 endlocal
 ```
 
-**How it works:** Each argument is inspected — if it looks like a Windows path (`X:\...`), it is converted to a WSL path via `wsl wslpath`. All other arguments (flags like `--ignore-missing-imports`) are passed through unchanged.
+**How it works:** If an argument looks like a Windows path (`X:\...`), the script changes it to a WSL path with `wsl wslpath`. Other arguments, such as `--ignore-missing-imports`, are passed through.
 
 #### 16.4 Configure SublimeLinter
 
@@ -475,7 +507,7 @@ Go to **Preferences → Package Settings → SublimeLinter → Settings** and ad
 
 #### 16.5 Verify it works
 
-To verify that `mypy` is correctly configured and talking to WSL:
+To check that `mypy` works with WSL:
 
 1. Create a `test_mypy.py` file in Sublime Text:
 
@@ -495,7 +527,7 @@ To verify that `mypy` is correctly configured and talking to WSL:
 
 ### 17. Installing Terminus on Sublime Text
 
-Terminus provides an integrated terminal within Sublime Text, allowing you to run WSL commands without switching windows.
+Terminus adds a terminal inside Sublime Text. You can run WSL commands without changing windows.
 
 #### 17.1 Install Package Control
 
@@ -510,6 +542,8 @@ Terminus provides an integrated terminal within Sublime Text, allowing you to ru
 - Hit Enter
 
 #### 17.3 Install Terminus
+
+Terminus is the Sublime Text package that opens the terminal panel.
 
 - **Ctrl + Shift + P**
 - Type "Package Control: Install Package" and hit Enter
@@ -596,39 +630,42 @@ If you are stuck in a terminal editor:
 
 ### 19. Haskell Setup via GHCup
 
-We will install GHCup, which manages Haskell compilers and tools.
+GHCup installs and manages Haskell tools.
+It installs GHC, which is the Haskell compiler.
 
-0. Install dependencies:
+1. Install dependencies:
 
    ```bash
    sudo apt install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev pkg-config
    ```
 
-1. Open your terminal (WSL for Windows users) and run:
+2. Open your terminal (WSL for Windows users) and run:
 
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
    ```
 
-2. During the installation, answer `y` (Yes) to most prompts, except:
+3. During the installation, answer `y` (Yes) to most questions, except:
    - **Base channel**: select `g` (GHCup maintained)
    - **Pre-releases / Cross channel**: answer `n` (No)
    - **PATH**: select `a` (Append) or `p` (Prepend)
 
-3. Once completed, load the new PATH:
+4. Once completed, load the new PATH:
 
    ```bash
    source ~/.bashrc
    ```
 
-4. Verify the installation:
+5. Verify the installation:
 
    ```bash
    ghcup --version
    ghc --version
    ```
 
-5. Install `stack`, Haskell Language Server, and `HUnit`:
+6. Install `stack`, Haskell Language Server, and `HUnit`:
+
+   `stack` builds Haskell packages. Haskell Language Server gives editor errors and hints. `HUnit` is used for Haskell tests.
 
    ```bash
    ghcup install stack latest
@@ -642,6 +679,8 @@ We will install GHCup, which manages Haskell compilers and tools.
 This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting and error checking.
 
 1. **Install Ormolu** (the Haskell code formatter) using stack:
+
+   Ormolu formats Haskell code so everyone uses the same style.
 
    ```bash
    stack install ormolu-0.7.2.0 --resolver lts-22.44
@@ -668,6 +707,9 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    ```
 
 3. Install LSP in Sublime Text:
+
+   LSP lets Sublime Text talk to Haskell Language Server.
+
    - Press **Ctrl + Shift + P**
    - Select **Package Control: Install Package**
    - Search for and install **LSP**
@@ -708,6 +750,8 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
 
 1. Create a `Hello.hs` file in Sublime Text:
 
+   This checks that GHC can run a simple Haskell program.
+
    ```haskell
    main :: IO ()
    main = putStrLn "Hello Haskell!!"
@@ -721,7 +765,8 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
 
 ### 22. Verify Ormolu and LSP
 
-Once you have verified the basic setup, create a `TestSetup.hs` to see the LSP in action.
+After the basic test works, create `TestSetup.hs` to test LSP.
+This checks formatting and error messages inside Sublime Text.
 
 1. Create a `TestSetup.hs` file in Sublime Text:
 
@@ -740,11 +785,11 @@ Once you have verified the basic setup, create a `TestSetup.hs` to see the LSP i
    ```
 
 2. **Save the file** and check if it auto-formats.
-3. **Uncomment** the `badValue` lines and save. You should see a red error underline or dot. Hover over it to see the error message (as shown below).
+3. Remove the `--` before the `badValue` lines and save. You should see a red error underline or dot. Move your mouse over it to see the error message.
 
    <img src="images/nix/img61_nix_haskell_lsp_verify.png" alt="Haskell LSP Verify" width="600">
 
-4. Comment it back and save the file — the error should disappear.
+4. Add the `--` back and save the file. The error should disappear.
 5. Run the file in the terminal (WSL):
 
    ```bash
@@ -764,7 +809,7 @@ If you have VSCode installed on Windows, you can use it from WSL:
 
 ### 24. Install lazydocker
 
-**lazydocker** provides a terminal UI for Docker. Since you are likely using Docker Desktop on Windows, this tool will connect to it.
+**lazydocker** gives Docker a terminal screen. If you use Docker Desktop on Windows, this tool can connect to it.
 
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads
@@ -869,9 +914,9 @@ To remove a WSL distribution:
    PS C:\WINDOWS\system32> wsl --unregister Ubuntu-24.04
    ```
 
-### Appendix E: Enabling Virtualization Technology
+### Appendix E: Enable Virtualization Technology
 
-1. Open Task Manager → Performance → Check if Virtualization is enabled
+1. Open Task Manager → Performance. Check if Virtualization is enabled.
 
 <img src="images/windows/img45_win_task_manager_virtualization.png" alt="Task Manager Virtualization" width="600">
 
