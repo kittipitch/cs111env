@@ -206,10 +206,10 @@ Verify the aliases:
 
 ```bash
 # Bash/WSL
-ls -ld /C: /D: 2>/dev/null
+ls -ld /[A-Z]: 2>/dev/null
 ```
 
-You should see entries such as `/C: -> /mnt/c` and `/D: -> /mnt/d`. If you add another Windows drive later, rerun the alias command.
+You should see entries such as `/C: -> /mnt/c` and, if your computer has a D: drive, `/D: -> /mnt/d`. If you add another Windows drive later, rerun the alias command.
 
 **(Optional) Move home directory to D: drive:**
 
@@ -700,6 +700,8 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    ```
 
    > **Note:** We use `bash -c "source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Sourcing it explicitly ensures `haskell-language-server-wrapper` is found regardless of how the shell profile is configured. HLS provides the Ormolu formatting plugin; the separate `ormolu` install above gives you the course-pinned command-line formatter.
+
+5. Restart Sublime Text, or open the command palette and run **LSP: Restart Servers**.
 
 ### 21. Create and Run a Haskell File (Hello World)
 
