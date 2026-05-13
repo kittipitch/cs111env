@@ -192,7 +192,7 @@ ln -sf "$HOME_DIR/Downloads" ~/
 
 **Create Windows drive aliases for WSL tools:**
 
-Windows editors such as Sublime Text may send paths like `D:/Users/...` to tools running inside WSL. Some tools normalize that to `/D:/Users/...`, while the real WSL path is `/mnt/d/Users/...`. Create drive aliases so both forms work:
+Sublime Text runs on Windows, but Haskell tools run inside WSL. Sometimes Sublime sends a Windows path such as `D:/Users/...`. Inside WSL, the real path is `/mnt/d/Users/...`. These aliases make both paths work:
 
 ```bash
 # Bash/WSL
@@ -202,14 +202,14 @@ for drive in /mnt/[a-z]; do
 done
 ```
 
-Verify the aliases:
+Check the aliases:
 
 ```bash
 # Bash/WSL
 ls -ld /[A-Z]: 2>/dev/null
 ```
 
-You should see entries such as `/C: -> /mnt/c` and, if your computer has a D: drive, `/D: -> /mnt/d`. If you add another Windows drive later, rerun the alias command.
+You should see entries such as `/C: -> /mnt/c`. If your computer has a D: drive, you should also see `/D: -> /mnt/d`. If you add another Windows drive later, run the alias command again.
 
 **(Optional) Move home directory to D: drive:**
 
@@ -639,15 +639,15 @@ We will install GHCup, which manages Haskell compilers and tools.
 
 ### 20. Configure Sublime Text for Haskell
 
-This setup is **mandatory** for CS115 to ensure proper code formatting and error checking.
+This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting and error checking.
 
-1. **Install Ormolu** (Haskell code formatter) globally using stack:
+1. **Install Ormolu** (the Haskell code formatter) using stack:
 
    ```bash
    stack install ormolu-0.7.2.0 --resolver lts-22.44
    ```
 
-   Verify that Haskell Language Server and Ormolu are available:
+   Check that Haskell Language Server and Ormolu are available:
 
    ```bash
    source ~/.ghcup/env
@@ -656,7 +656,8 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    ```
 
 2. Make Sublime Text use 2 spaces for Haskell indentation:
-   - Save a blank file as `test.hs` to trigger the Haskell syntax, then go to **Preferences → Settings - Syntax Specific**.
+   - Save a blank file as `test.hs`. This tells Sublime Text that the file is Haskell.
+   - Go to **Preferences → Settings - Syntax Specific**.
    - Add the following configuration:
 
    ```json
@@ -666,13 +667,13 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    }
    ```
 
-3. Connect to the Haskell LSP (Language Server Protocol):
+3. Install LSP in Sublime Text:
    - Press **Ctrl + Shift + P**
    - Select **Package Control: Install Package**
    - Search for and install **LSP**
 
-4. Configure the LSP settings for Haskell:
-   - Open command palette again and select **Preferences: LSP Settings**
+4. Configure LSP for Haskell:
+   - Open the command palette again and select **Preferences: LSP Settings**
    - Add the following configuration:
 
    ```json
@@ -699,7 +700,7 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    }
    ```
 
-   > **Note:** We use `bash -c "source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Sourcing it explicitly ensures `haskell-language-server-wrapper` is found regardless of how the shell profile is configured. HLS provides the Ormolu formatting plugin; the separate `ormolu` install above gives you the course-pinned command-line formatter.
+   > **Note:** This command loads GHCup first, then starts Haskell Language Server. HLS gives Sublime Text Haskell errors and formatting. The separate `ormolu` install above gives you the course version of the command-line formatter.
 
 5. Restart Sublime Text, or open the command palette and run **LSP: Restart Servers**.
 
