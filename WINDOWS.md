@@ -628,10 +628,11 @@ We will install GHCup, which manages Haskell compilers and tools.
    ghc --version
    ```
 
-5. Install `stack` and `HUnit`:
+5. Install `stack`, Haskell Language Server, and `HUnit`:
 
    ```bash
    ghcup install stack latest
+   ghcup install hls latest
    cabal update
    cabal install --lib HUnit
    ```
@@ -644,6 +645,14 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
 
    ```bash
    stack install ormolu-0.7.2.0 --resolver lts-22.44
+   ```
+
+   Verify that Haskell Language Server and Ormolu are available:
+
+   ```bash
+   source ~/.ghcup/env
+   haskell-language-server-wrapper --version
+   ormolu --version
    ```
 
 2. Make Sublime Text use 2 spaces for Haskell indentation:
@@ -679,7 +688,7 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
            "wsl",
            "bash",
            "-c",
-           "source ~/.ghcup/env && haskell-language-server-wrapper --lsp"
+           "export PATH=$HOME/.local/bin:$PATH && source ~/.ghcup/env && haskell-language-server-wrapper --lsp"
          ],
          "selector": "source.haskell",
          "settings": {
@@ -690,7 +699,7 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    }
    ```
 
-   > **Note:** We use `bash -c "source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Sourcing it explicitly ensures `haskell-language-server-wrapper` is found regardless of how the shell profile is configured.
+   > **Note:** We use `bash -c "export PATH=$HOME/.local/bin:$PATH && source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Adding `$HOME/.local/bin` ensures the Ormolu formatter installed by `stack install` can also be found.
 
 ### 21. Create and Run a Haskell File (Hello World)
 
