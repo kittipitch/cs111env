@@ -190,6 +190,27 @@ ln -sf "$HOME_DIR/Documents" ~/
 ln -sf "$HOME_DIR/Downloads" ~/
 ```
 
+**Create Windows drive aliases for WSL tools:**
+
+Windows editors such as Sublime Text may send paths like `D:/Users/...` to tools running inside WSL. Some tools normalize that to `/D:/Users/...`, while the real WSL path is `/mnt/d/Users/...`. Create drive aliases so both forms work:
+
+```bash
+# Bash/WSL
+for drive in /mnt/[a-z]; do
+  letter=$(basename "$drive" | tr '[:lower:]' '[:upper:]')
+  sudo ln -sfn "$drive" "/$letter:"
+done
+```
+
+Verify the aliases:
+
+```bash
+# Bash/WSL
+ls -ld /C: /D: 2>/dev/null
+```
+
+You should see entries such as `/C: -> /mnt/c` and `/D: -> /mnt/d`. If you add another Windows drive later, rerun the alias command.
+
 **(Optional) Move home directory to D: drive:**
 
 ```bash
