@@ -688,7 +688,7 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
            "wsl",
            "bash",
            "-c",
-           "export PATH=$HOME/.local/bin:$PATH && source ~/.ghcup/env && haskell-language-server-wrapper --lsp"
+           "source ~/.ghcup/env && haskell-language-server-wrapper --lsp"
          ],
          "selector": "source.haskell",
          "settings": {
@@ -699,7 +699,7 @@ This setup is **mandatory** for CS115 to ensure proper code formatting and error
    }
    ```
 
-   > **Note:** We use `bash -c "export PATH=$HOME/.local/bin:$PATH && source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Adding `$HOME/.local/bin` ensures the Ormolu formatter installed by `stack install` can also be found.
+   > **Note:** We use `bash -c "source ~/.ghcup/env && ..."` instead of `bash -lc` because the login shell (`.bash_profile`) does not source `~/.ghcup/env` automatically. Sourcing it explicitly ensures `haskell-language-server-wrapper` is found regardless of how the shell profile is configured. HLS provides the Ormolu formatting plugin; the separate `ormolu` install above gives you the course-pinned command-line formatter.
 
 ### 21. Create and Run a Haskell File (Hello World)
 
