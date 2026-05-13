@@ -113,7 +113,7 @@ pip3 --version      # Should reference 3.12
 
 #### Option 2: Official installer
 
-Download the macOS installer from <https://www.python.org/downloads/> and choose the latest **3.12** release.
+Download the macOS installer from <https://www.python.org/downloads/> and choose a **Python 3.12.x** release. Do not choose Python 3.13 or newer for this course.
 
 After installing, add aliases to your shell (more reliable than symlinks):
 
@@ -384,15 +384,21 @@ It installs GHC, which is the Haskell compiler.
    ghc --version
    ```
 
-5. Install `stack`, Haskell Language Server, and `HUnit`:
+5. Install the course versions of `stack`, Haskell Language Server, and `HUnit`:
 
-   `stack` builds Haskell packages. Haskell Language Server gives editor errors and hints. `HUnit` is used for Haskell tests.
+   The autojudge uses fixed software versions. We install the same versions here so your computer behaves like the judge. `stack` builds Haskell packages. Haskell Language Server gives editor errors and hints. `HUnit` is used for Haskell tests.
 
    ```bash
-   ghcup install stack latest
-   ghcup install hls latest
+   ghcup install ghc 9.6.7
+   ghcup set ghc 9.6.7
+   ghcup install cabal 3.14.2.0
+   ghcup set cabal 3.14.2.0
+   ghcup install stack 3.7.1
+   ghcup set stack 3.7.1
+   ghcup install hls 2.13.0.0
+   ghcup set hls 2.13.0.0
    cabal update
-   cabal install --lib HUnit
+   cabal install --lib HUnit-1.6.2.0 --force-reinstalls
    ```
 
 ### 16. Configure Sublime Text for Haskell
