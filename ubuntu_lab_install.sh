@@ -213,6 +213,11 @@ install_dotfiles() {  # install_dotfiles <user> <home>
     sudo mkdir -p "$home/.ghcup"
     sudo cp -f "$UBUNTU_HOME_TMP/.ghcup/env-lab" "$home/.ghcup/env"
   fi
+  # Point per-user GHC default env → global env so plain `ghci` finds HUnit
+  # without requiring explicit -package-env flags.
+  local ghc_envdir="$home/.ghc/x86_64-linux-${GHC_VER}/environments"
+  sudo mkdir -p "$ghc_envdir"
+  sudo ln -sf "$GHC_ENV" "$ghc_envdir/default"
   # Ormolu/LSP verification file on the Desktop (see UBUNTU.md "Verify Ormolu
   # and LSP").
   sudo mkdir -p "$home/Desktop"
@@ -492,6 +497,10 @@ verify_account() {  # verify_account <user>
   if sudo grep -q "/usr/local/.ghcup/bin" "$home/.ghcup/env" 2>/dev/null; then
     echo "    [ OK ] .ghcup/env -> global toolchain"
   else echo "    [FAIL] .ghcup/env missing/!global"; VFAIL=$((VFAIL+1)); fi
+  local ghc_env_link="$home/.ghc/x86_64-linux-${GHC_VER}/environments/default"
+  if sudo test -L "$ghc_env_link" && sudo test -e "$ghc_env_link"; then
+    echo "    [ OK ] GHC default env -> global (HUnit visible to plain ghci)"
+  else echo "    [FAIL] GHC default env symlink missing"; VFAIL=$((VFAIL+1)); fi
   if sudo test -f "$home/.config/sublime-text/Packages/User/LSP.sublime-settings"; then
     echo "    [ OK ] Sublime LSP settings (correct path)"
   else echo "    [FAIL] Sublime LSP.sublime-settings missing/!correct path"; VFAIL=$((VFAIL+1)); fi
