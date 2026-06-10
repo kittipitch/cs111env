@@ -221,15 +221,25 @@ mypy --version
 
 #### 13.2 Install SublimeLinter and SublimeLinter-mypy
 
-1. **⌘ + Shift + P** → "Package Control: Install Package"
+SublimeLinter shows Python type errors inside Sublime Text.
+
+1. **Ctrl + Shift + P** → "Package Control: Add Repository"
+- Paste: `https://github.com/SublimeLinter/SublimeLinter`
+- Hit Enter
+
+2. **Add Repository** again but this time is for SublimeLinter-mypy
+- **Ctrl + Shift + P** → "Package Control: Add Repository"
+- Paste: `https://github.com/SublimeLinter/SublimeLinter-mypy`
+- Hit Enter
+
+3. **Ctrl + Shift + P** → "Package Control: Install Package"
 <img src="images/common/img05_common_sublime_install_package_control.png" alt="Sublime Linter 1" width="600">
 
-2. Type "SublimeLinter" and hit Enter.
+4. Type "SublimeLinter" and hit Enter.
 <img src="images/common/img32_common_sublime_install_linter.png" alt="Sublime Linter 3" width="600">
 
-3. **⌘ + Shift + P** → "Package Control: Install Package"
-4. Type "SublimeLinter-mypy" and hit Enter.
-
+5. **Ctrl + Shift + P** → "Package Control: Install Package"
+6. Type "SublimeLinter-mypy" and hit Enter.
 <img src="images/common/img33_common_sublime_install_linter_mypy.png" alt="Sublime Linter 4" width="600">
 
 #### 13.3 Configure SublimeLinter
