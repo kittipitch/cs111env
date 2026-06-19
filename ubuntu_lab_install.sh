@@ -142,10 +142,34 @@ do_basic_tools() {
   sudo apt install -y \
     tar zip unzip git build-essential bash-completion xz-utils \
     python3-pip python3-venv pipenv pipx mypy \
-    tmux byobu dos2unix xclip fzf \
+    tmux byobu dos2unix xclip fzf scrot \
     emacs-nox vim neovim bat \
     wget curl gnupg ca-certificates \
     kdiff3
+}
+
+# ============================================================
+# Extra apps — Brave browser + WezTerm (system-wide, all users)
+# ============================================================
+# Installed via their upstream apt repos. Idempotent.
+do_apps() {
+  if ! command -v brave-browser >/dev/null 2>&1; then
+    sudo install -d -m0755 /usr/share/keyrings
+    sudo curl -fsSL https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
+      -o /usr/share/keyrings/brave-browser-archive-keyring.gpg 2>/dev/null || true
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+      | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+    sudo apt update 2>/dev/null || true
+    sudo apt install -y brave-browser 2>/dev/null || echo "    (brave install failed — continuing)"
+  fi
+  if ! command -v wezterm >/dev/null 2>&1; then
+    curl -fsSL https://apt.fury.io/wez/gpg.key 2>/dev/null \
+      | sudo gpg --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg 2>/dev/null || true
+    echo "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *" \
+      | sudo tee /etc/apt/sources.list.d/wezterm.list >/dev/null
+    sudo apt update 2>/dev/null || true
+    sudo apt install -y wezterm 2>/dev/null || echo "    (wezterm install failed — continuing)"
+  fi
 }
 
 # Programming fonts (UBUNTU.md §4): FiraCode + IosevkaTerm Nerd Font. The lab
@@ -266,6 +290,161 @@ install_all_dotfiles() {
   fi
   sudo rm -rf "$UBUNTU_HOME_TMP"
   return 0
+}
+
+# ============================================================
+# XFCE theme (Numix) — apply to the student session
+# ============================================================
+# The lab image auto-logs the student in, so we set the theme live via
+# xfconf-query. We also drop an autostart entry so the theme re-applies on
+# every login — idempotent and self-healing (survives first-login races and
+# profile resets). GTK/WM = Numix, icons = Numix-Circle.
+do_xfce_theme() {
+  sudo apt install -y numix-gtk-theme numix-icon-theme numix-icon-theme-circle paper-icon-theme 2>/dev/null || true
+  local su shome uid
+  su="${STUDENT_ACCOUNT:-student}"
+  shome="$(getent passwd "$su" | cut -d: -f6)"
+  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
+  uid="$(id -u "$su" 2>/dev/null)" || { echo "    [skip] no user '$su'"; return 1; }
+
+  # Autostart: re-apply the theme on every login.
+  sudo mkdir -p "$shome/.config/autostart"
+  sudo tee "$shome/.config/autostart/numix-theme.desktop" >/dev/null <<'DESK'
+[Desktop Entry]
+Type=Application
+Name=Apply Numix Theme
+Exec=sh -c "xfconf-query -c xsettings -p /Net/ThemeName -s Numix; xfconf-query -c xfwm4 -p /general/theme -s Numix; xfconf-query -c xsettings -p /Net/IconThemeName -s Numix-Circle"
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
+DESK
+  sudo chown "$su:$su" "$shome/.config/autostart/numix-theme.desktop"
+
+  # Apply live if a graphical session is up for the student right now.
+  if loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | grep -qx "$uid"; then
+    sudo -u "$su" DISPLAY=:0 XAUTHORITY="$shome/.Xauthority" \
+         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+         bash -c '
+           xfconf-query -c xsettings -p /Net/ThemeName     -s Numix         2>/dev/null || true
+           xfconf-query -c xfwm4   -p /general/theme       -s Numix         2>/dev/null || true
+           xfconf-query -c xsettings -p /Net/IconThemeName -s Numix-Circle  2>/dev/null || true
+         ' && echo "    [ OK ] Numix theme applied live for '$su'"
+  else
+    echo "    [ OK ] Numix autostart installed for '$su' (applies next login)"
+  fi
+
+  # Solid dark-grey desktop background (no wallpaper image). Applies live if a
+  # session is up; otherwise the student gets it on next login.
+  if loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | grep -qx "$uid"; then
+    sudo -u "$su" DISPLAY=:0 XAUTHORITY="$shome/.Xauthority" \
+         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" bash -c '
+      ch=xfce4-desktop
+      xfconf-query -c "$ch" -l 2>/dev/null | grep -E "/(image-style|color-style|color1)$" | while read -r p; do
+        case "$p" in
+          *image-style|*color-style) xfconf-query -c "$ch" -p "$p" -s 0 ;;
+          *color1)                   xfconf-query -c "$ch" -p "$p" -s "#222222" ;;
+        esac
+      done
+    ' 2>/dev/null && echo "    [ OK ] dark-grey wallpaper for '$su'"
+  fi
+  return 0
+}
+
+# ============================================================
+# XFCE panel — apps + launchers (only where XFCE is installed)
+# ============================================================
+# Installs Brave, Sublime Text, xfce4-terminal, WezTerm and seeds the panel
+# for the student: whiskermenu + 4 app launchers + tasklist + tray + clock.
+# Disk-seeded into xfconf, so it applies on the next login (the lab image
+# auto-logs the student in, so a reboot after install picks it up). Idempotent.
+do_xfce_panel() {
+  command -v xfce4-panel >/dev/null 2>&1 || { echo "    [skip] no XFCE on this host"; return 0; }
+  local su shome
+  su="${STUDENT_ACCOUNT:-student}"
+  shome="$(getent passwd "$su" | cut -d: -f6)"
+  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
+
+  # --- apps (terminal + editor; Brave/WezTerm installed by do_apps) ---
+  command -v xfce4-terminal >/dev/null 2>&1 || sudo apt install -y xfce4-terminal 2>/dev/null || true
+  command -v subl >/dev/null 2>&1 || sudo snap install sublime-text --classic 2>/dev/null || true
+
+  # --- panel layout + launchers (seed into xfconf XML) ---
+  local pdir="$shome/.config/xfce4/panel"
+  local xdir="$shome/.config/xfce4/xfconf/xfce-perchannel-xml"
+  sudo mkdir -p "$pdir" "$xdir"
+  sudo rm -rf "$pdir"/launcher-{3,4,5,6} 2>/dev/null || true
+
+  _seed_launcher() {  # pid  label  system.desktop
+    local pid="$1" label="$2" sys="$3" id
+    [ -f "$sys" ] || return 1
+    id="${pid}1000000001"
+    sudo mkdir -p "$pdir/launcher-$pid"
+    sudo cp -f "$sys" "$pdir/launcher-$pid/$id.desktop"
+    sudo sed -i "s/^Name=.*/Name=$label/" "$pdir/launcher-$pid/$id.desktop" 2>/dev/null || true
+    echo "$id"
+  }
+  local subl_desk; subl_desk="$(ls /var/lib/snapd/desktop/applications/sublime-text*.desktop /usr/share/applications/sublime_text.desktop 2>/dev/null | head -1)"
+  local wez_desk;  wez_desk="$(ls /usr/share/applications/wezterm.desktop /usr/share/applications/org.wezfurl*.desktop 2>/dev/null | head -1)"
+  local L3 L4 L5 L6
+  L3=$(_seed_launcher 3 Brave        /usr/share/applications/brave-browser.desktop)        || L3=""
+  L4=$(_seed_launcher 4 "Sublime Text" "$subl_desk")                                      || L4=""
+  L5=$(_seed_launcher 5 Terminal     /usr/share/applications/xfce4-terminal.desktop)      || L5=""
+  L6=$(_seed_launcher 6 WezTerm      "$wez_desk")                                         || L6=""
+
+  sudo tee "$xdir/xfce4-panel.xml" >/dev/null <<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0">
+  <property name="panels" type="uint" value="1">
+    <property name="panel-0" type="empty">
+      <property name="position" type="string" value="p=6;x=0;y=0"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="length" type="uint" value="100"/>
+      <property name="length-adjust" type="bool" value="true"/>
+      <property name="size" type="uint" value="26"/>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="1"/><value type="int" value="2"/><value type="int" value="3"/>
+        <value type="int" value="4"/><value type="int" value="5"/><value type="int" value="6"/>
+        <value type="int" value="7"/><value type="int" value="8"/><value type="int" value="9"/>
+        <value type="int" value="10"/><value type="int" value="11"/><value type="int" value="12"/>
+        <value type="int" value="13"/>
+      </property>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="whiskermenu"/>
+    <property name="plugin-2" type="string" value="separator"><property name="expand" type="bool" value="false"/><property name="style" type="uint" value="0"/></property>
+    <property name="plugin-3" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L3}.desktop"/></property></property>
+    <property name="plugin-4" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L4}.desktop"/></property></property>
+    <property name="plugin-5" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L5}.desktop"/></property></property>
+    <property name="plugin-6" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L6}.desktop"/></property></property>
+    <property name="plugin-7" type="string" value="separator"><property name="expand" type="bool" value="true"/><property name="style" type="uint" value="0"/></property>
+    <property name="plugin-8" type="string" value="tasklist"><property name="flat-buttons" type="bool" value="true"/><property name="show-handle" type="bool" value="false"/></property>
+    <property name="plugin-9" type="string" value="separator"><property name="expand" type="bool" value="true"/><property name="style" type="uint" value="0"/></property>
+    <property name="plugin-10" type="string" value="pulseaudio"/>
+    <property name="plugin-11" type="string" value="systray"/>
+    <property name="plugin-12" type="string" value="power-manager-plugin"/>
+    <property name="plugin-13" type="string" value="clock"><property name="digital-format" type="string" value="%d %b, %H:%M"/><property name="mode" type="uint" value="2"/></property>
+  </property>
+</channel>
+XML
+  sudo chown -R "$su:$su" "$shome/.config/xfce4"
+  echo "    [ OK ] XFCE panel + launchers seeded for '$su' (applies next login)"
+  return 0
+}
+
+# ============================================================
+# Disable lightdm autologin (students log in manually)
+# ============================================================
+# Takes effect at the next lightdm restart / reboot. The seeded XFCE theme +
+# panel still apply on the student's first manual login.
+do_disable_autologin() {
+  local f=/etc/lightdm/lightdm.conf
+  [ -f "$f" ] || { echo "    [skip] no $f"; return 0; }
+  if sudo grep -qE '^autologin-user=' "$f"; then
+    sudo sed -i 's/^autologin-user=.*/autologin-user=/' "$f"
+    echo "    [ OK ] autologin disabled (next lightdm restart)"
+  else
+    echo "    [skip] autologin already unset"
+  fi
 }
 
 # ============================================================
@@ -586,9 +765,13 @@ echo "Ubuntu lab setup — resilient run (continues on errors, verifies at end).
 step "Student account"            setup_student_account
 step "System update"              do_system_update
 step "Basic tools"                do_basic_tools
+step "Apps (Brave, WezTerm)"      do_apps
 step "Programming fonts"          do_fonts
 step "uv (Python pkg mgr)"        do_uv
 step "Dot files (ubuntu_home)"    install_all_dotfiles
+step "XFCE theme (Numix)"         do_xfce_theme
+step "XFCE panel (apps + launchers)" do_xfce_panel
+step "Disable lightdm autologin"     do_disable_autologin
 step "Python (numpy/pandas)"      do_python
 step "Sublime Text"               do_sublime
 step "Haskell deps"               do_haskell_deps
