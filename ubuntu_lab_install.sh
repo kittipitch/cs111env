@@ -68,6 +68,9 @@ CABAL_PKGDB="/usr/local/lib/ghc-${GHC_VER}/cabal-store/ghc-${GHC_VER}/package.db
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PASSWORD_FILE="$SCRIPT_DIR/student_password.txt"
+# ntfy discovery creds (NTFY_URL/TOPIC/USER/PASS) for the self-hosted ntfy on
+# score_cron. Gitignored — must NOT be in the public ubuntu_home repo.
+NTFY_SECRET_FILE="${NTFY_SECRET_FILE:-$SCRIPT_DIR/ntfy_admin.secret}"
 
 # Whether the installer (admin) account was provisioned with dot files this run
 # (used by verify to know whether to check the admin home).
@@ -293,6 +296,70 @@ install_all_dotfiles() {
 }
 
 # ============================================================
+# ntfy discovery — phone home @reboot (survives the dotfile .config wipe)
+# ============================================================
+# install_all_dotfiles replaces ~/.config, which would wipe the ntfy reporter
+# config. This step re-deploys it for the student so the box keeps registering
+# its IP on every boot. Creds from NTFY_SECRET_FILE (gitignored, NOT in the
+# public ubuntu_home repo). Run AFTER install_all_dotfiles.
+do_ntfy_report() {
+  local su shome
+  su="${STUDENT_ACCOUNT:-student}"
+  shome="$(getent passwd "$su" | cut -d: -f6)"
+  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
+  if [ ! -f "$NTFY_SECRET_FILE" ]; then
+    echo "    [skip] no $NTFY_SECRET_FILE — ntfy discovery not deployed"
+    return 0
+  fi
+  set -a; . "$NTFY_SECRET_FILE"; set +a
+  if [ -z "${NTFY_URL:-}" ] || [ -z "${NTFY_TOPIC:-}" ]; then
+    echo "    [skip] ntfy secret incomplete"; return 0
+  fi
+
+  sudo mkdir -p "$shome/.config/major-room" "$shome/bin"
+  sudo tee "$shome/bin/major-room-report.sh" >/dev/null <<'REP'
+#!/usr/bin/env bash
+# Phone home @reboot: publish this box's MAC/IP/host to the self-hosted ntfy.
+set -u
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/major-room/ntfy.conf"
+[ -r "$CONF" ] || exit 0
+. "$CONF"
+[ -z "${NTFY_URL:-}" ] || [ -z "${NTFY_TOPIC:-}" ] && exit 0
+if=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+[ -z "$if" ] && exit 0
+mac=$(cat "/sys/class/net/$if/address" 2>/dev/null)
+[ -z "$mac" ] && exit 0
+ip4=$(ip -4 -o addr show "$if" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
+hn=$(hostname); ts=$(date -u +%FT%TZ)
+for _ in $(seq 1 6); do
+  code=$(curl -s -m 6 -o /dev/null -w '%{http_code}' \
+    -u "${NTFY_USER:-}:${NTFY_PASS:-}" -H "Title: $hn" -H "Tags: $mac" \
+    -d "mac=$mac ip=$ip4 iface=$if host=$hn ts=$ts" "${NTFY_URL%/}/${NTFY_TOPIC}" 2>/dev/null || echo 000)
+  [ "$code" = 200 ] && exit 0
+  sleep 15
+done
+exit 0
+REP
+  sudo chmod +x "$shome/bin/major-room-report.sh"
+  sudo tee "$shome/.config/major-room/ntfy.conf" >/dev/null <<EOF
+NTFY_URL=$NTFY_URL
+NTFY_TOPIC=$NTFY_TOPIC
+NTFY_USER=${NTFY_USER:-}
+NTFY_PASS=${NTFY_PASS:-}
+EOF
+  sudo chmod 600 "$shome/.config/major-room/ntfy.conf"
+  sudo chown -R "$su:$su" "$shome/.config/major-room" "$shome/bin/major-room-report.sh"
+  # crontab @reboot (idempotent; file-form for portability across hosts)
+  local tmp; tmp="$(mktemp)"
+  { sudo -u "$su" crontab -l 2>/dev/null | grep -v 'major-room-report.sh'; \
+    printf '@reboot %s/bin/major-room-report.sh\n' "$shome"; } > "$tmp"
+  sudo -u "$su" crontab "$tmp" 2>/dev/null
+  rm -f "$tmp"
+  echo "    [ OK ] ntfy @reboot report for '$su'"
+  return 0
+}
+
+# ============================================================
 # XFCE theme (Numix) — apply to the student session
 # ============================================================
 # The lab image auto-logs the student in, so we set the theme live via
@@ -437,14 +504,18 @@ XML
 # Takes effect at the next lightdm restart / reboot. The seeded XFCE theme +
 # panel still apply on the student's first manual login.
 do_disable_autologin() {
-  local f=/etc/lightdm/lightdm.conf
-  [ -f "$f" ] || { echo "    [skip] no $f"; return 0; }
-  if sudo grep -qE '^autologin-user=' "$f"; then
-    sudo sed -i 's/^autologin-user=.*/autologin-user=/' "$f"
-    echo "    [ OK ] autologin disabled (next lightdm restart)"
-  else
-    echo "    [skip] autologin already unset"
-  fi
+  local f changed=0
+  # Patch every active lightdm config (main file + conf.d drop-ins; the Veriton
+  # image uses /etc/lightdm/lightdm.conf.d/lightdm.conf, the iMacs use the main file).
+  for f in /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf; do
+    [ -f "$f" ] || continue
+    if sudo grep -qE '^autologin-user=' "$f"; then
+      sudo sed -i 's/^autologin-user=.*/autologin-user=/' "$f"
+      echo "    [ OK ] autologin disabled in $f"
+      changed=1
+    fi
+  done
+  [ "$changed" = 0 ] && echo "    [skip] no autologin-user found in any lightdm config"
 }
 
 # ============================================================
@@ -769,6 +840,7 @@ step "Apps (Brave, WezTerm)"      do_apps
 step "Programming fonts"          do_fonts
 step "uv (Python pkg mgr)"        do_uv
 step "Dot files (ubuntu_home)"    install_all_dotfiles
+step "ntfy discovery (@reboot)"   do_ntfy_report
 step "XFCE theme (Numix)"         do_xfce_theme
 step "XFCE panel (apps + launchers)" do_xfce_panel
 step "Disable lightdm autologin"     do_disable_autologin
