@@ -1,2 +1,6 @@
 .omc/
+student_password.txt
 ntfy_admin.secret
+*.secret
+.env
+.env.*

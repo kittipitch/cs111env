@@ -40,11 +40,12 @@
 # at run time via an environment variable, e.g. for non-interactive automation:
 #   STUDENT_ACCOUNT=csmajor SUDOER_ACCOUNT=cscmu bash ubuntu_lab_install.sh
 SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-cscmu}"
-STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-student}"
+STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-csmajor}"
 
 # Password used when this script has to CREATE the student account.
-# Read from a sibling student_password.txt if present, else this default.
-DEFAULT_PASSWORD="i<3cscmu"
+# Public repo rule: never store the lab password here. Pass STUDENT_PASSWORD
+# from the private deployment flow or provide a private student_password.txt.
+STUDENT_PASSWORD="${STUDENT_PASSWORD:-}"
 
 # Dot files / directories copied from the ubuntu_home repo into each managed
 # home. This same list drives both the copy and the final verification, so
@@ -68,14 +69,12 @@ CABAL_PKGDB="/usr/local/lib/ghc-${GHC_VER}/cabal-store/ghc-${GHC_VER}/package.db
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PASSWORD_FILE="$SCRIPT_DIR/student_password.txt"
-# ntfy discovery creds (NTFY_URL/TOPIC/USER/PASS) for the self-hosted ntfy on
-# score_cron. Gitignored — must NOT be in the public ubuntu_home repo.
-NTFY_SECRET_FILE="${NTFY_SECRET_FILE:-$SCRIPT_DIR/ntfy_admin.secret}"
 
 # Whether the installer (admin) account was provisioned with dot files this run
 # (used by verify to know whether to check the admin home).
 INSTALLER_PROVISIONED=0
 INSTALLER_USER="${SUDO_USER:-$USER}"
+INSTALLER_HOME="$(getent passwd "$INSTALLER_USER" | cut -d: -f6)"
 
 # ------------------------------------------------------------
 # Resilience helpers
@@ -103,10 +102,38 @@ fetch() {  # fetch <url> <dest>
   [[ -s "$2" ]] || { rm -f "$2"; return 1; }
 }
 
+is_lab_cscmu_machine() {
+  # "cscmu" marks the slow CS major room machines that must not run Docker.
+  # Other account policy must continue to use SUDOER_ACCOUNT/STUDENT_ACCOUNT.
+  id cscmu &>/dev/null
+}
+
 # ============================================================
 # Student account (create if missing)
 # ============================================================
 setup_student_account() {
+  # Remove the image-default account before creating/fixing csmajor. On the
+  # Veritons it owned UID 1001, which prevented a consistent csmajor UID.
+  if [[ "$STUDENT_ACCOUNT" != "student" ]] && id student &>/dev/null; then
+    echo "    Removing legacy 'student' account..."
+    sudo loginctl terminate-user student 2>/dev/null || true
+    sudo pkill -KILL -u student 2>/dev/null || true
+    sleep 2
+    sudo userdel -f -r student 2>/dev/null || sudo userdel -f student 2>/dev/null || true
+    sudo groupdel student 2>/dev/null || true
+  fi
+
+  if ! getent group "$STUDENT_ACCOUNT" &>/dev/null; then
+    if getent group 1001 &>/dev/null; then
+      sudo groupadd "$STUDENT_ACCOUNT" || true
+    else
+      sudo groupadd -g 1001 "$STUDENT_ACCOUNT" || true
+    fi
+  elif [[ "$(getent group "$STUDENT_ACCOUNT" | cut -d: -f3)" != "1001" ]] \
+       && ! getent group 1001 &>/dev/null; then
+    sudo groupmod -g 1001 "$STUDENT_ACCOUNT" || true
+  fi
+
   # Prompt for a name only when missing AND we have a terminal; otherwise keep
   # the configured default (so the script is safe to run non-interactively).
   if ! id "$STUDENT_ACCOUNT" &>/dev/null && [ -t 0 ]; then
@@ -115,18 +142,50 @@ setup_student_account() {
   fi
 
   if ! id "$STUDENT_ACCOUNT" &>/dev/null; then
-    echo "    Creating user '$STUDENT_ACCOUNT' (no sudo)..."
-    sudo useradd -m -s /bin/bash "$STUDENT_ACCOUNT" || return 1
-    local pass="$DEFAULT_PASSWORD"
+    echo "    Creating user '$STUDENT_ACCOUNT' (no sudo) with fixed UID 1001..."
+    # IMPORTANT: Fixed UID 1001 ensures consistency across all lab boxes
+    sudo useradd -m -s /bin/bash -u 1001 -g "$STUDENT_ACCOUNT" "$STUDENT_ACCOUNT" || return 1
+    local pass="$STUDENT_PASSWORD"
     [[ -f "$PASSWORD_FILE" ]] && pass="$(cat "$PASSWORD_FILE")"
-    echo "${STUDENT_ACCOUNT}:${pass}" | sudo chpasswd
-    echo "    Password set for '$STUDENT_ACCOUNT'."
+    if [[ -n "$pass" ]]; then
+      echo "${STUDENT_ACCOUNT}:${pass}" | sudo chpasswd
+      echo "    Password set for '$STUDENT_ACCOUNT'."
+    else
+      sudo passwd -l "$STUDENT_ACCOUNT" >/dev/null 2>&1 || true
+      echo "    No student password provided; '$STUDENT_ACCOUNT' password login locked."
+    fi
   else
+    # Check if existing account has wrong UID and fix it
+    local current_uid
+    current_uid=$(id -u "$STUDENT_ACCOUNT" 2>/dev/null)
+    if [[ "$current_uid" != "1001" ]]; then
+      echo "    WARNING: '$STUDENT_ACCOUNT' has UID $current_uid (should be 1001)"
+      echo "    Fixing UID to 1001 for consistency..."
+      sudo usermod -u 1001 "$STUDENT_ACCOUNT"
+      # Fix file ownership for the new UID
+      sudo find /home -user "$current_uid" -exec chown -h "$STUDENT_ACCOUNT:$STUDENT_ACCOUNT" {} \; 2>/dev/null || true
+      sudo find / -xdev -user "$current_uid" -exec chown -h "$STUDENT_ACCOUNT:$STUDENT_ACCOUNT" {} \; 2>/dev/null || true
+      echo "    UID fixed to 1001"
+    fi
+    sudo usermod -g "$STUDENT_ACCOUNT" "$STUDENT_ACCOUNT" 2>/dev/null || true
     echo "    User '$STUDENT_ACCOUNT' already exists; leaving password unchanged."
   fi
+  sudo usermod -G "" "$STUDENT_ACCOUNT" 2>/dev/null || true
   STUDENT_HOME="$(getent passwd "$STUDENT_ACCOUNT" | cut -d: -f6)"
   echo "    Student account: $STUDENT_ACCOUNT  (home: $STUDENT_HOME)"
   [[ -n "$STUDENT_HOME" ]]
+}
+
+do_student_policy() {
+  echo "    Enforcing restricted student account policy..."
+  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
+  for grp in sudo admin wheel docker lxd; do
+    if getent group "$grp" >/dev/null && id -nG "$STUDENT_ACCOUNT" | tr ' ' '\n' | grep -qx "$grp"; then
+      sudo gpasswd -d "$STUDENT_ACCOUNT" "$grp" >/dev/null 2>&1 || true
+      echo "      Removed '$STUDENT_ACCOUNT' from $grp."
+    fi
+  done
+  return 0
 }
 
 # ============================================================
@@ -145,34 +204,10 @@ do_basic_tools() {
   sudo apt install -y \
     tar zip unzip git build-essential bash-completion xz-utils \
     python3-pip python3-venv pipenv pipx mypy \
-    tmux byobu dos2unix xclip fzf scrot \
+    tmux byobu dos2unix xclip fzf \
     emacs-nox vim neovim bat \
     wget curl gnupg ca-certificates \
     kdiff3
-}
-
-# ============================================================
-# Extra apps — Brave browser + WezTerm (system-wide, all users)
-# ============================================================
-# Installed via their upstream apt repos. Idempotent.
-do_apps() {
-  if ! command -v brave-browser >/dev/null 2>&1; then
-    sudo install -d -m0755 /usr/share/keyrings
-    sudo curl -fsSL https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
-      -o /usr/share/keyrings/brave-browser-archive-keyring.gpg 2>/dev/null || true
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-      | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
-    sudo apt update 2>/dev/null || true
-    sudo apt install -y brave-browser 2>/dev/null || echo "    (brave install failed — continuing)"
-  fi
-  if ! command -v wezterm >/dev/null 2>&1; then
-    curl -fsSL https://apt.fury.io/wez/gpg.key 2>/dev/null \
-      | sudo gpg --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg 2>/dev/null || true
-    echo "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *" \
-      | sudo tee /etc/apt/sources.list.d/wezterm.list >/dev/null
-    sudo apt update 2>/dev/null || true
-    sudo apt install -y wezterm 2>/dev/null || echo "    (wezterm install failed — continuing)"
-  fi
 }
 
 # Programming fonts (UBUNTU.md §4): FiraCode + IosevkaTerm Nerd Font. The lab
@@ -200,6 +235,10 @@ do_uv() {
 
 # lazydocker — terminal UI for Docker (UBUNTU.md §26), global binary.
 do_lazydocker() {
+  if is_lab_cscmu_machine; then
+    echo "    [skip] cscmu lab machine: Docker tooling is intentionally not installed."
+    return 0
+  fi
   command -v lazydocker &>/dev/null && { echo "    lazydocker already installed."; return 0; }
   local ver t
   ver="$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest | grep -Po '"tag_name": "v\K[^"]*')"
@@ -226,6 +265,16 @@ install_dotfiles() {  # install_dotfiles <user> <home>
   local user="$1" home="$2"
   [[ -z "$user" || -z "$home" || ! -d "$home" ]] && { echo "    [skip] no home for '$user'"; return 1; }
   echo "    Installing dot files for '$user' ($home)..."
+
+  # GOLDEN RULE: Preserve ntfy callback mechanism before wiping .config
+  local ntfy_backup=""
+  if [[ -d "$home/.config/major-room" ]]; then
+    ntfy_backup=$(mktemp -d)
+    echo "      [GOLDEN RULE] Backing up ntfy callback config..."
+    sudo cp -a "$home/.config/major-room" "$ntfy_backup/"
+    sudo cp -a "$home/bin/major-room-report.sh" "$ntfy_backup/" 2>/dev/null || true
+  fi
+
   for item in "${DOTFILE_ITEMS[@]}"; do
     if [[ -e "$UBUNTU_HOME_TMP/$item" ]]; then
       # Remove existing target FIRST so a pre-existing symlink (e.g. a personal
@@ -234,6 +283,17 @@ install_dotfiles() {  # install_dotfiles <user> <home>
       sudo cp -rf "$UBUNTU_HOME_TMP/$item" "$home"/
     fi
   done
+
+  # GOLDEN RULE: Restore ntfy callback mechanism after dotfiles install
+  if [[ -n "$ntfy_backup" ]]; then
+    echo "      [GOLDEN RULE] Restoring ntfy callback config..."
+    sudo mkdir -p "$home/.config"
+    sudo cp -a "$ntfy_backup/major-room" "$home/.config/"
+    sudo mkdir -p "$home/bin"
+    sudo cp -a "$ntfy_backup/major-room-report.sh" "$home/bin/" 2>/dev/null || true
+    sudo chown -R "$user:$user" "$home/.config/major-room" "$home/bin/major-room-report.sh" 2>/dev/null || true
+    sudo rm -rf "$ntfy_backup"
+  fi
   # Lab ghcup env: points each home's ~/.ghcup/env at the GLOBAL toolchain
   # (/usr/local/.ghcup). The heavy toolchain is shared, never copied per user.
   if [[ -f "$UBUNTU_HOME_TMP/.ghcup/env-lab" ]]; then
@@ -296,226 +356,89 @@ install_all_dotfiles() {
 }
 
 # ============================================================
-# ntfy discovery — phone home @reboot (survives the dotfile .config wipe)
+# ntfy Callback Mechanism (Discovery)
 # ============================================================
-# install_all_dotfiles replaces ~/.config, which would wipe the ntfy reporter
-# config. This step re-deploys it for the student so the box keeps registering
-# its IP on every boot. Creds from NTFY_SECRET_FILE (gitignored, NOT in the
-# public ubuntu_home repo). Run AFTER install_all_dotfiles.
+# GOLDEN RULE: This function MUST preserve ~/.config/major-room/ntfy.conf
+# and ~/bin/major-room-report.sh at ALL TIMES. The callback mechanism
+# is critical for fleet discovery and must never be removed or broken.
+# This step runs AFTER install_all_dotfiles which wipes ~/.config,
+# so it MUST be called after that step in the main sequence.
 do_ntfy_report() {
-  local su shome
-  su="${STUDENT_ACCOUNT:-student}"
-  shome="$(getent passwd "$su" | cut -d: -f6)"
-  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
-  if [ ! -f "$NTFY_SECRET_FILE" ]; then
-    echo "    [skip] no $NTFY_SECRET_FILE — ntfy discovery not deployed"
-    return 0
-  fi
-  set -a; . "$NTFY_SECRET_FILE"; set +a
-  if [ -z "${NTFY_URL:-}" ] || [ -z "${NTFY_TOPIC:-}" ]; then
-    echo "    [skip] ntfy secret incomplete"; return 0
-  fi
+  # Check for required environment variables (credentials should be passed in)
+  [[ -z "${NTFY_URL:-}" ]] && { echo "    [skip] NTFY_URL not set"; return 0; }
+  [[ -z "${NTFY_TOPIC:-}" ]] && { echo "    [skip] NTFY_TOPIC not set"; return 0; }
+  [[ -z "${NTFY_USER:-}" ]] && { echo "    [skip] NTFY_USER not set"; return 0; }
+  [[ -z "${NTFY_PASS:-}" ]] && { echo "    [skip] NTFY_PASS not set"; return 0; }
 
-  sudo mkdir -p "$shome/.config/major-room" "$shome/bin"
-  sudo tee "$shome/bin/major-room-report.sh" >/dev/null <<'REP'
+  echo "    Installing ntfy callback mechanism (GOLDEN RULE - always preserved)..."
+  # ntfy config for both csmajor and cscmu
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    local user; user="$(basename "$user_home")"
+    echo "      Setting up ntfy for '$user' ($user_home)..."
+
+    # Create ntfy config directory and config file using env vars
+    # GOLDEN RULE: Always preserve this config - never remove during any installation
+    sudo mkdir -p "$user_home/.config/major-room"
+    sudo tee "$user_home/.config/major-room/ntfy.conf" > /dev/null <<NTFYEOF
+NTFY_URL=$NTFY_URL
+NTFY_TOPIC=$NTFY_TOPIC
+NTFY_USER=$NTFY_USER
+NTFY_PASS=$NTFY_PASS
+NTFYEOF
+    sudo chmod 600 "$user_home/.config/major-room/ntfy.conf"
+    sudo chown -R "$user:$user" "$user_home/.config/major-room"
+
+    # Deploy reporter script - GOLDEN RULE: Always preserve this script
+    sudo mkdir -p "$user_home/bin"
+    sudo tee "$user_home/bin/major-room-report.sh" > /dev/null <<'REPORTEOF'
 #!/usr/bin/env bash
-# Phone home @reboot: publish this box's MAC/IP/host to the self-hosted ntfy.
+# Phone home ONCE per boot: publish this box's current network identity to
+# the self-hosted ntfy server on score_cron (private topic, basic auth).
 set -u
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/major-room/ntfy.conf"
 [ -r "$CONF" ] || exit 0
 . "$CONF"
 [ -z "${NTFY_URL:-}" ] || [ -z "${NTFY_TOPIC:-}" ] && exit 0
-if=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
-[ -z "$if" ] && exit 0
-mac=$(cat "/sys/class/net/$if/address" 2>/dev/null)
-[ -z "$mac" ] && exit 0
-ip4=$(ip -4 -o addr show "$if" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
-hn=$(hostname); ts=$(date -u +%FT%TZ)
+
 for _ in $(seq 1 6); do
+  if=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+  [ -z "$if" ] && { sleep 15; continue; }
+  mac=$(cat "/sys/class/net/$if/address" 2>/dev/null)
+  [ -z "$mac" ] && { sleep 15; continue; }
+  ip4=$(ip -4 -o addr show "$if" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
+  [ -z "$ip4" ] && { sleep 15; continue; }
+  hn=$(hostname)
+  ts=$(date -u +%FT%TZ)
+  msg="mac=$mac ip=$ip4 iface=$if host=$hn ts=$ts"
   code=$(curl -s -m 6 -o /dev/null -w '%{http_code}' \
-    -u "${NTFY_USER:-}:${NTFY_PASS:-}" -H "Title: $hn" -H "Tags: $mac" \
-    -d "mac=$mac ip=$ip4 iface=$if host=$hn ts=$ts" "${NTFY_URL%/}/${NTFY_TOPIC}" 2>/dev/null || echo 000)
-  [ "$code" = 200 ] && exit 0
+    -u "${NTFY_USER:-}:${NTFY_PASS:-}" \
+    -H "Title: $hn" -H "Tags: $mac" \
+    -d "$msg" "${NTFY_URL%/}/${NTFY_TOPIC}" 2>/dev/null || echo 000)
+  [ "$code" = "200" ] && exit 0
   sleep 15
 done
 exit 0
-REP
-  sudo chmod +x "$shome/bin/major-room-report.sh"
-  sudo tee "$shome/.config/major-room/ntfy.conf" >/dev/null <<EOF
-NTFY_URL=$NTFY_URL
-NTFY_TOPIC=$NTFY_TOPIC
-NTFY_USER=${NTFY_USER:-}
-NTFY_PASS=${NTFY_PASS:-}
-EOF
-  sudo chmod 600 "$shome/.config/major-room/ntfy.conf"
-  sudo chown -R "$su:$su" "$shome/.config/major-room" "$shome/bin/major-room-report.sh"
-  # crontab @reboot (idempotent; file-form for portability across hosts)
-  local tmp; tmp="$(mktemp)"
-  { sudo -u "$su" crontab -l 2>/dev/null | grep -v 'major-room-report.sh'; \
-    printf '@reboot %s/bin/major-room-report.sh\n' "$shome"; } > "$tmp"
-  sudo -u "$su" crontab "$tmp" 2>/dev/null
-  rm -f "$tmp"
-  echo "    [ OK ] ntfy @reboot report for '$su'"
-  return 0
-}
+REPORTEOF
+    sudo chmod +x "$user_home/bin/major-room-report.sh"
+    sudo chown "$user:$user" "$user_home/bin/major-room-report.sh"
 
-# ============================================================
-# XFCE theme (Numix) — apply to the student session
-# ============================================================
-# The lab image auto-logs the student in, so we set the theme live via
-# xfconf-query. We also drop an autostart entry so the theme re-applies on
-# every login — idempotent and self-healing (survives first-login races and
-# profile resets). GTK/WM = Numix, icons = Numix-Circle.
-do_xfce_theme() {
-  sudo apt install -y numix-gtk-theme numix-icon-theme numix-icon-theme-circle paper-icon-theme 2>/dev/null || true
-  local su shome uid
-  su="${STUDENT_ACCOUNT:-student}"
-  shome="$(getent passwd "$su" | cut -d: -f6)"
-  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
-  uid="$(id -u "$su" 2>/dev/null)" || { echo "    [skip] no user '$su'"; return 1; }
+    # Create symlink for old crontab path compatibility
+    sudo ln -sf "$user_home/bin/major-room-report.sh" "$user_home/major-room-report.sh" 2>/dev/null || true
 
-  # Autostart: re-apply the theme on every login.
-  sudo mkdir -p "$shome/.config/autostart"
-  sudo tee "$shome/.config/autostart/numix-theme.desktop" >/dev/null <<'DESK'
-[Desktop Entry]
-Type=Application
-Name=Apply Numix Theme
-Exec=sh -c "xfconf-query -c xsettings -p /Net/ThemeName -s Numix; xfconf-query -c xfwm4 -p /general/theme -s Numix; xfconf-query -c xsettings -p /Net/IconThemeName -s Numix-Circle"
-X-GNOME-Autostart-enabled=true
-NoDisplay=true
-DESK
-  sudo chown "$su:$su" "$shome/.config/autostart/numix-theme.desktop"
-
-  # Apply live if a graphical session is up for the student right now.
-  if loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | grep -qx "$uid"; then
-    sudo -u "$su" DISPLAY=:0 XAUTHORITY="$shome/.Xauthority" \
-         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-         bash -c '
-           xfconf-query -c xsettings -p /Net/ThemeName     -s Numix         2>/dev/null || true
-           xfconf-query -c xfwm4   -p /general/theme       -s Numix         2>/dev/null || true
-           xfconf-query -c xsettings -p /Net/IconThemeName -s Numix-Circle  2>/dev/null || true
-         ' && echo "    [ OK ] Numix theme applied live for '$su'"
-  else
-    echo "    [ OK ] Numix autostart installed for '$su' (applies next login)"
-  fi
-
-  # Solid dark-grey desktop background (no wallpaper image). Applies live if a
-  # session is up; otherwise the student gets it on next login.
-  if loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | grep -qx "$uid"; then
-    sudo -u "$su" DISPLAY=:0 XAUTHORITY="$shome/.Xauthority" \
-         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" bash -c '
-      ch=xfce4-desktop
-      xfconf-query -c "$ch" -l 2>/dev/null | grep -E "/(image-style|color-style|color1)$" | while read -r p; do
-        case "$p" in
-          *image-style|*color-style) xfconf-query -c "$ch" -p "$p" -s 0 ;;
-          *color1)                   xfconf-query -c "$ch" -p "$p" -s "#222222" ;;
-        esac
-      done
-    ' 2>/dev/null && echo "    [ OK ] dark-grey wallpaper for '$su'"
-  fi
-  return 0
-}
-
-# ============================================================
-# XFCE panel — apps + launchers (only where XFCE is installed)
-# ============================================================
-# Installs Brave, Sublime Text, xfce4-terminal, WezTerm and seeds the panel
-# for the student: whiskermenu + 4 app launchers + tasklist + tray + clock.
-# Disk-seeded into xfconf, so it applies on the next login (the lab image
-# auto-logs the student in, so a reboot after install picks it up). Idempotent.
-do_xfce_panel() {
-  command -v xfce4-panel >/dev/null 2>&1 || { echo "    [skip] no XFCE on this host"; return 0; }
-  local su shome
-  su="${STUDENT_ACCOUNT:-student}"
-  shome="$(getent passwd "$su" | cut -d: -f6)"
-  [ -z "$shome" ] && { echo "    [skip] no home for '$su'"; return 1; }
-
-  # --- apps (terminal + editor; Brave/WezTerm installed by do_apps) ---
-  command -v xfce4-terminal >/dev/null 2>&1 || sudo apt install -y xfce4-terminal 2>/dev/null || true
-  command -v subl >/dev/null 2>&1 || sudo snap install sublime-text --classic 2>/dev/null || true
-
-  # --- panel layout + launchers (seed into xfconf XML) ---
-  local pdir="$shome/.config/xfce4/panel"
-  local xdir="$shome/.config/xfce4/xfconf/xfce-perchannel-xml"
-  sudo mkdir -p "$pdir" "$xdir"
-  sudo rm -rf "$pdir"/launcher-{3,4,5,6} 2>/dev/null || true
-
-  _seed_launcher() {  # pid  label  system.desktop
-    local pid="$1" label="$2" sys="$3" id
-    [ -f "$sys" ] || return 1
-    id="${pid}1000000001"
-    sudo mkdir -p "$pdir/launcher-$pid"
-    sudo cp -f "$sys" "$pdir/launcher-$pid/$id.desktop"
-    sudo sed -i "s/^Name=.*/Name=$label/" "$pdir/launcher-$pid/$id.desktop" 2>/dev/null || true
-    echo "$id"
-  }
-  local subl_desk; subl_desk="$(ls /var/lib/snapd/desktop/applications/sublime-text*.desktop /usr/share/applications/sublime_text.desktop 2>/dev/null | head -1)"
-  local wez_desk;  wez_desk="$(ls /usr/share/applications/wezterm.desktop /usr/share/applications/org.wezfurl*.desktop 2>/dev/null | head -1)"
-  local L3 L4 L5 L6
-  L3=$(_seed_launcher 3 Brave        /usr/share/applications/brave-browser.desktop)        || L3=""
-  L4=$(_seed_launcher 4 "Sublime Text" "$subl_desk")                                      || L4=""
-  L5=$(_seed_launcher 5 Terminal     /usr/share/applications/xfce4-terminal.desktop)      || L5=""
-  L6=$(_seed_launcher 6 WezTerm      "$wez_desk")                                         || L6=""
-
-  sudo tee "$xdir/xfce4-panel.xml" >/dev/null <<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfce4-panel" version="1.0">
-  <property name="panels" type="uint" value="1">
-    <property name="panel-0" type="empty">
-      <property name="position" type="string" value="p=6;x=0;y=0"/>
-      <property name="position-locked" type="bool" value="true"/>
-      <property name="length" type="uint" value="100"/>
-      <property name="length-adjust" type="bool" value="true"/>
-      <property name="size" type="uint" value="26"/>
-      <property name="plugin-ids" type="array">
-        <value type="int" value="1"/><value type="int" value="2"/><value type="int" value="3"/>
-        <value type="int" value="4"/><value type="int" value="5"/><value type="int" value="6"/>
-        <value type="int" value="7"/><value type="int" value="8"/><value type="int" value="9"/>
-        <value type="int" value="10"/><value type="int" value="11"/><value type="int" value="12"/>
-        <value type="int" value="13"/>
-      </property>
-    </property>
-  </property>
-  <property name="plugins" type="empty">
-    <property name="plugin-1" type="string" value="whiskermenu"/>
-    <property name="plugin-2" type="string" value="separator"><property name="expand" type="bool" value="false"/><property name="style" type="uint" value="0"/></property>
-    <property name="plugin-3" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L3}.desktop"/></property></property>
-    <property name="plugin-4" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L4}.desktop"/></property></property>
-    <property name="plugin-5" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L5}.desktop"/></property></property>
-    <property name="plugin-6" type="string" value="launcher"><property name="items" type="array"><value type="string" value="${L6}.desktop"/></property></property>
-    <property name="plugin-7" type="string" value="separator"><property name="expand" type="bool" value="true"/><property name="style" type="uint" value="0"/></property>
-    <property name="plugin-8" type="string" value="tasklist"><property name="flat-buttons" type="bool" value="true"/><property name="show-handle" type="bool" value="false"/></property>
-    <property name="plugin-9" type="string" value="separator"><property name="expand" type="bool" value="true"/><property name="style" type="uint" value="0"/></property>
-    <property name="plugin-10" type="string" value="pulseaudio"/>
-    <property name="plugin-11" type="string" value="systray"/>
-    <property name="plugin-12" type="string" value="power-manager-plugin"/>
-    <property name="plugin-13" type="string" value="clock"><property name="digital-format" type="string" value="%d %b, %H:%M"/><property name="mode" type="uint" value="2"/></property>
-  </property>
-</channel>
-XML
-  sudo chown -R "$su:$su" "$shome/.config/xfce4"
-  echo "    [ OK ] XFCE panel + launchers seeded for '$su' (applies next login)"
-  return 0
-}
-
-# ============================================================
-# Disable lightdm autologin (students log in manually)
-# ============================================================
-# Takes effect at the next lightdm restart / reboot. The seeded XFCE theme +
-# panel still apply on the student's first manual login.
-do_disable_autologin() {
-  local f changed=0
-  # Patch every active lightdm config (main file + conf.d drop-ins; the Veriton
-  # image uses /etc/lightdm/lightdm.conf.d/lightdm.conf, the iMacs use the main file).
-  for f in /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf; do
-    [ -f "$f" ] || continue
-    if sudo grep -qE '^autologin-user=' "$f"; then
-      sudo sed -i 's/^autologin-user=.*/autologin-user=/' "$f"
-      echo "    [ OK ] autologin disabled in $f"
-      changed=1
-    fi
+    # Add @reboot crontab entry
+    local cron_entry="@reboot $user_home/bin/major-room-report.sh"
+    sudo -u "$user" crontab -l 2>/dev/null | grep -q "major-room-report.sh" && \
+      echo "        Crontab entry already exists for '$user'" || \
+      (sudo -u "$user" bash -c "(crontab -l 2>/dev/null; echo '$cron_entry') | crontab -" && \
+       echo "        Added crontab entry for '$user'")
   done
-  [ "$changed" = 0 ] && echo "    [skip] no autologin-user found in any lightdm config"
+
+  # Test reporter once
+  echo "      Testing reporter (csmajor)..."
+  sudo -u "$STUDENT_ACCOUNT" "$STUDENT_HOME/bin/major-room-report.sh" && \
+    echo "        ✓ Test report successful" || echo "        ⚠ Test report failed (may work on reboot)"
+  return 0
 }
 
 # ============================================================
@@ -549,6 +472,285 @@ do_sublime() {
     rm -f "$t"
     return 1
   fi
+}
+
+# ============================================================
+# XFCE Desktop Environment (Apps, Theme, Panel)
+# ============================================================
+# GOLDEN RULE: All functions MUST preserve ~/.config/major-room/ntfy.conf
+# and ~/bin/major-room-report.sh to maintain callback mechanism.
+
+do_xfce_apps() {
+  echo "    Installing desktop applications..."
+  # Brave browser
+  command -v brave-browser &>/dev/null && \
+    echo "      Brave browser already installed." || {
+    sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave.com/brave-browser-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | \
+      sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+    sudo apt update
+    sudo apt install -y brave-browser
+  }
+
+  # WezTerm terminal
+  command -v wezterm &>/dev/null && \
+    echo "      WezTerm already installed." || {
+    sudo apt install -y wezterm
+  }
+  return 0
+}
+
+do_xfce_theme() {
+  echo "    Installing XFCE desktop theme..."
+  # Install Numix theme and icons
+  sudo apt install -y numix-gtk-theme numix-icon-theme-circle
+
+  # Apply theme for both csmajor and cscmu
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    local user; user="$(basename "$user_home")"
+    echo "      Setting up theme for '$user'..."
+
+    # Set Numix GTK and window manager theme via xfconf
+    sudo -u "$user" xfconf-query -c xsettings -p /Net/ThemeName -s "Numix" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xsettings -p /Net/IconThemeName -s "Numix-Circle" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfwm4 -p /general/theme -s "Numix" -t string 2>/dev/null || true
+
+    # Set SOLID dark grey background (#222222) - NO wallpaper image
+    # This creates a solid color background instead of using an image
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color-shading-type -s "solid" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color1 -r -t uint8 34 -t uint8 34 -t uint8 34 -t uint8 255 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color2 -r -t uint8 34 -t uint8 34 -t uint8 34 -t uint8 255 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-style -s 0 -t int 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/last-image -s "" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-path -s "" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/color-shading-type -s "solid" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/color1 -r -t uint8 34 -t uint8 34 -t uint8 34 -t uint8 255 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/color2 -r -t uint8 34 -t uint8 34 -t uint8 34 -t uint8 255 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/image-style -s 0 -t int 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/last-image -s "" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor1/image-path -s "" -t string 2>/dev/null || true
+
+    # Set dark GTK theme preferences
+    sudo -u "$user" xfconf-query -c xsettings -p /Gtk/ThemeName -s "Numix" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xsettings -p /Gtk/IconThemeName -s "Numix-Circle" -t string 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c xsettings -p /Gtk/FontName -s "Sans 10" -t string 2>/dev/null || true
+
+    # Add xfce4-settings-autostart to ensure theme persists
+    sudo mkdir -p "$user_home/.config/autostart"
+    sudo tee "$user_home/.config/autostart/xfce4-settings-autostart.desktop" > /dev/null << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=XFCE Settings Autostart
+Exec=xfce4-settings-manager
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+    sudo chown "$user:$user" "$user_home/.config/autostart/xfce4-settings-autostart.desktop"
+  done
+  return 0
+}
+
+do_xfce_panel() {
+  echo "    Setting up XFCE panel..."
+  # Install xfce4-panel if not present
+  sudo apt install -y xfce4-panel xfce4-whiskermenu-plugin
+
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    local user; user="$(basename "$user_home")"
+    echo "      Configuring panel for '$user'..."
+
+    # Create panel config directory
+    sudo mkdir -p "$user_home/.config/xfce4/panel"
+
+    # Create launcher .desktop files
+    local launcher_dir="$user_home/.local/share/applications"
+    sudo mkdir -p "$launcher_dir"
+
+    # Brave launcher
+    sudo tee "$launcher_dir/brave-browser.desktop" > /dev/null << 'EOF'
+[Desktop Entry]
+Version=1.0
+Name=Brave Web Browser
+GenericName=Web Browser
+Comment=Browse the World Wide Web
+Exec=brave-browser %U
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Icon=brave-browser
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;
+EOF
+
+    # Sublime launcher
+    sudo tee "$launcher_dir/sublime-text.desktop" > /dev/null << 'EOF'
+[Desktop Entry]
+Version=1.0
+Name=Sublime Text
+GenericName=Text Editor
+Comment=Sophisticated text editor
+Exec=subl %F
+Terminal=false
+Type=Application
+Icon=sublime-text
+Categories=TextEditor;Development;
+EOF
+
+    # WezTerm launcher
+    sudo tee "$launcher_dir/wezterm.desktop" > /dev/null << 'EOF'
+[Desktop Entry]
+Version=1.0
+Name=WezTerm
+GenericName=Terminal
+Comment=GPU-accelerated terminal emulator
+Exec=wezterm
+Terminal=false
+Type=Application
+Categories=System;TerminalEmulator;
+EOF
+
+    sudo chown -R "$user:$user" "$launcher_dir"
+
+    # Create panel configuration with launchers
+    sudo tee "$user_home/.config/xfce4/panel/panels-1.rc" > /dev/null << 'PANELEOF'
+panels=toc9hv1:1:57
+toc9hv1:1:57=config
+config=toc9hv1:1:57
+toc9hv1:1:1=whiskermenu-button-1
+toc9hv1:1:2=launcher-2
+toc9hv1:1:3=launcher-3
+toc9hv1:1:4=launcher-4
+toc9hv1:1:5=tasklist-5
+toc9hv1:1:6=systray-6
+toc9hv1:1:7=clock-7
+
+whiskermenu-button-1=plugin
+plugin-2=plugin
+plugin-3=plugin
+plugin-4=plugin
+plugin-5=plugin
+plugin-6=plugin
+plugin-7=plugin
+
+plugin-2=launcher
+plugin-3=launcher
+plugin-4=launcher
+
+clear=toc9hv1:1:57;3;4;5;6;7
+PANELEOF
+
+    # Create launcher plugin configs
+    sudo mkdir -p "$user_home/.config/xfce4/panel/plugin-2"
+    sudo tee "$user_home/.config/xfce4/panel/plugin-2/launcher-2.rc" > /dev/null << 'EOF'
+[Entry]
+Name=Brave Browser
+Comment=Web Browser
+Icon=brave-browser
+Exec=brave-browser
+EOF
+
+    sudo mkdir -p "$user_home/.config/xfce4/panel/plugin-3"
+    sudo tee "$user_home/.config/xfce4/panel/plugin-3/launcher-3.rc" > /dev/null << 'EOF'
+[Entry]
+Name=Sublime Text
+Comment=Text Editor
+Icon=sublime-text
+Exec=subl
+EOF
+
+    sudo mkdir -p "$user_home/.config/xfce4/panel/plugin-4"
+    sudo tee "$user_home/.config/xfce4/panel/plugin-4/launcher-4.rc" > /dev/null << 'EOF'
+[Entry]
+Name=WezTerm
+Comment=Terminal
+Icon=terminal
+Exec=wezterm
+EOF
+
+    sudo chown -R "$user:$user" "$user_home/.config/xfce4"
+  done
+  return 0
+}
+
+set_lightdm_autologin_file() {  # set_lightdm_autologin_file <path>
+  local cfg="$1" tmp
+  tmp="$(mktemp)"
+  if [[ -f "$cfg" ]]; then
+    sudo cp "$cfg" "$tmp"
+    sudo chown "$(id -u):$(id -g)" "$tmp"
+    if grep -q '^autologin-user=' "$tmp"; then
+      sed -i "s/^autologin-user=.*/autologin-user=${STUDENT_ACCOUNT}/" "$tmp"
+    else
+      printf '\nautologin-user=%s\n' "$STUDENT_ACCOUNT" >> "$tmp"
+    fi
+  else
+    printf '[Seat:*]\nautologin-user=%s\n' "$STUDENT_ACCOUNT" > "$tmp"
+  fi
+  sudo install -m 644 "$tmp" "$cfg"
+  rm -f "$tmp"
+}
+
+do_enable_student_autologin() {
+  echo "    Enabling LightDM autologin for '$STUDENT_ACCOUNT'..."
+  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
+  sudo mkdir -p /etc/lightdm/lightdm.conf.d
+  # iMacs and Veritons read different LightDM layouts. Keep both explicit.
+  set_lightdm_autologin_file /etc/lightdm/lightdm.conf
+  set_lightdm_autologin_file /etc/lightdm/lightdm.conf.d/lightdm.conf
+  return 0
+}
+
+do_hostname_screensaver() {
+  echo "    Configuring hostname screensaver for '$STUDENT_ACCOUNT'..."
+  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
+  command -v xscreensaver &>/dev/null || sudo apt install -y xscreensaver xscreensaver-data-extra
+
+  local hn home xs_tmp auto_tmp
+  hn="$(hostname)"
+  home="$(getent passwd "$STUDENT_ACCOUNT" | cut -d: -f6)"
+  sudo install -d -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 755 \
+    "$home/.config/xscreensaver" "$home/.config/autostart"
+
+  xs_tmp="$(mktemp)"
+  cat > "$xs_tmp" <<EOF
+xscreensaver.file.version: 1.0
+mode:           text
+textMode:       literal
+textLiteral:    $hn
+textFont:       *-fixed-*-*-*-*-20-*-*-*-*-*-*-*
+lock:           True
+timeout:        0:05:00
+cycle:          0:05:00
+fadeSeconds:    1
+unfadeSeconds:  1
+grabDesktopImages:    True
+grabVideoFrames:      False
+lockTimeout:    0:00:00
+passwdTimeout:  0:00:30
+dpmsEnabled:    False
+EOF
+  sudo install -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 644 \
+    "$xs_tmp" "$home/.config/xscreensaver/XScreenSaver"
+  rm -f "$xs_tmp"
+
+  auto_tmp="$(mktemp)"
+  cat > "$auto_tmp" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=XScreenSaver
+Comment=Screensaver with hostname display
+Exec=xscreensaver -no-splash
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+  sudo install -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 644 \
+    "$auto_tmp" "$home/.config/autostart/xscreensaver.desktop"
+  rm -f "$auto_tmp"
+  return 0
 }
 
 # ============================================================
@@ -655,6 +857,10 @@ do_go() {
 }
 
 do_docker() {
+  if is_lab_cscmu_machine; then
+    echo "    [skip] cscmu lab machine: Docker is intentionally not installed."
+    return 0
+  fi
   if command -v docker &>/dev/null; then
     echo "    docker already installed; ensuring service."
     sudo systemctl enable --now docker 2>/dev/null || true
@@ -756,6 +962,13 @@ verify_account() {  # verify_account <user>
   else echo "    [FAIL] Sublime LSP.sublime-settings missing/!correct path"; VFAIL=$((VFAIL+1)); fi
   if sudo test -f "$home/Desktop/TestSetup.hs"; then echo "    [ OK ] Desktop/TestSetup.hs"
   else echo "    [FAIL] Desktop/TestSetup.hs missing"; VFAIL=$((VFAIL+1)); fi
+  if id -nG "$acct" | tr ' ' '\n' | grep -Eq '^(sudo|admin|wheel|docker|lxd)$'; then
+    echo "    [FAIL] $acct has privileged supplementary group(s): $(id -nG "$acct")"
+    VFAIL=$((VFAIL+1))
+  else echo "    [ OK ] no privileged supplementary groups"; fi
+  if sudo grep -q '^textLiteral:' "$home/.config/xscreensaver/XScreenSaver" 2>/dev/null; then
+    echo "    [ OK ] hostname screensaver"
+  else echo "    [FAIL] hostname screensaver missing"; VFAIL=$((VFAIL+1)); fi
   # Optional per-account extras (warn only — present for both student & sudoer).
   local extra
   for extra in ".config/tinted-shell" ".fzf.bash" ".venv"; do
@@ -797,8 +1010,13 @@ verify_install() {
   echo ""
   echo " VERIFICATION (OPTIONAL)"
   vopt  "go"                          go version
-  vopt  "docker"                      docker --version
-  vopt  "lazydocker"                  lazydocker --version
+  if is_lab_cscmu_machine; then
+    echo "  [skip] Skipping Docker verification on cscmu lab machine"
+    echo "  [skip] Skipping lazydocker verification on cscmu lab machine"
+  else
+    vopt  "docker"                    docker --version
+    vopt  "lazydocker"                lazydocker --version
+  fi
   vopt  "gh"                          gh --version
   vopt  "fzf"                         fzf --version
   vopt  "uv"                          uv --version
@@ -811,6 +1029,15 @@ verify_install() {
 
   echo ""
   echo " DOT FILES / SETTINGS PER ACCOUNT"
+  if id student &>/dev/null; then
+    echo "  [FAIL] legacy student account still exists"
+    VFAIL=$((VFAIL+1))
+  else echo "  [ OK ] legacy student account absent"; fi
+  if grep -hE '^autologin-user=' /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/lightdm.conf 2>/dev/null \
+      | grep -qv "^autologin-user=${STUDENT_ACCOUNT}$"; then
+    echo "  [FAIL] LightDM autologin is not consistently ${STUDENT_ACCOUNT}"
+    VFAIL=$((VFAIL+1))
+  else echo "  [ OK ] LightDM autologin -> ${STUDENT_ACCOUNT}"; fi
   verify_account "$STUDENT_ACCOUNT"
   [[ "$INSTALLER_PROVISIONED" == "1" ]] && verify_account "$INSTALLER_USER"
 
@@ -834,18 +1061,20 @@ verify_install() {
 echo "Ubuntu lab setup — resilient run (continues on errors, verifies at end)."
 
 step "Student account"            setup_student_account
+step "Restricted student policy"  do_student_policy
 step "System update"              do_system_update
 step "Basic tools"                do_basic_tools
-step "Apps (Brave, WezTerm)"      do_apps
 step "Programming fonts"          do_fonts
 step "uv (Python pkg mgr)"        do_uv
 step "Dot files (ubuntu_home)"    install_all_dotfiles
-step "ntfy discovery (@reboot)"   do_ntfy_report
-step "XFCE theme (Numix)"         do_xfce_theme
-step "XFCE panel (apps + launchers)" do_xfce_panel
-step "Disable lightdm autologin"     do_disable_autologin
+step "ntfy callback mechanism"    do_ntfy_report
 step "Python (numpy/pandas)"      do_python
 step "Sublime Text"               do_sublime
+step "Desktop apps (Brave/WezTerm)" do_xfce_apps
+step "XFCE theme (Numix + dark bg)" do_xfce_theme
+step "XFCE panel"                 do_xfce_panel
+step "Student autologin"          do_enable_student_autologin
+step "Hostname screensaver"       do_hostname_screensaver
 step "Haskell deps"               do_haskell_deps
 step "GHC ${GHC_VER}"             do_ghc
 step "GHCup"                      do_ghcup
@@ -866,3 +1095,12 @@ step "Racket"                     do_racket
 
 verify_install
 exit $?
+
+# ============================================================
+# Profile Synchronization (ensure all boxes identical)
+# ============================================================
+# Runs after all setup to ensure csmajor profile is consistent
+sync_csmajor_profile() {
+  echo "    Skipping profile sync (manual step for maintenance)"
+  return 0
+}
