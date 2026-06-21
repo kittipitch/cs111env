@@ -108,6 +108,55 @@ is_lab_cscmu_machine() {
   id cscmu &>/dev/null
 }
 
+is_veriton_machine() {
+  hostname | grep -qi 'veriton' && return 0
+  hostnamectl 2>/dev/null | grep -qi 'veriton'
+}
+
+disable_unit_if_present() {  # disable_unit_if_present <unit>
+  local unit="$1"
+  if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q "^${unit}[[:space:]]"; then
+    sudo systemctl disable --now "$unit" 2>/dev/null || true
+  else
+    echo "    [skip] $unit not installed"
+  fi
+}
+
+do_disable_veriton_slow_boot_services() {
+  if ! is_veriton_machine; then
+    echo "    [skip] not a Veriton host"
+    return 0
+  fi
+
+  echo "    Disabling slow boot services on Veriton host..."
+  local unit
+  for unit in \
+    NetworkManager-wait-online.service \
+    apport.service \
+    snapd.service \
+    snapd.seeded.service \
+    snapd.socket \
+    snapd.apparmor.service \
+    bluetooth.service \
+    avahi-daemon.service \
+    avahi-daemon.socket \
+    cups.service \
+    cups.socket \
+    cups.path \
+    cups-browsed.service \
+    e2scrub_reap.service \
+    e2scrub_all.service \
+    e2scrub_all.timer \
+    apt-daily.service \
+    apt-daily.timer \
+    apt-daily-upgrade.service \
+    apt-daily-upgrade.timer
+  do
+    disable_unit_if_present "$unit"
+  done
+  return 0
+}
+
 # ============================================================
 # Student account (create if missing)
 # ============================================================
@@ -1088,6 +1137,7 @@ step "NodeJS 24"                  do_node
 step "Go 1.19.13"                 do_go
 step "Docker"                     do_docker
 step "lazydocker"                 do_lazydocker
+step "Veriton slow boot services" do_disable_veriton_slow_boot_services
 step "GitHub CLI"                 do_gh
 step "Ruby"                       do_ruby
 step "SWI-Prolog"                 do_prolog
