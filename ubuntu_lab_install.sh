@@ -756,53 +756,226 @@ do_enable_student_autologin() {
   return 0
 }
 
-do_hostname_screensaver() {
-  echo "    Configuring hostname screensaver for '$STUDENT_ACCOUNT'..."
-  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
-  command -v xscreensaver &>/dev/null || sudo apt install -y xscreensaver xscreensaver-data-extra
+do_ip_screensaver() {
+  # XScreenSaver (phosphor) showing hostname + CURRENT IP, but ONLY when the box
+  # can actually reach the internet (so a stale DHCP IP is never displayed).
+  # v6.08 reads ~/.xscreensaver (NOT ~/.config/xscreensaver/XScreenSaver).
+  # Saver appears at 5 min; the monitor powers off (DPMS) at 35 min. Also
+  # disables xfce4-screensaver (conflicts). Applied to both managed accounts.
+  echo "    Configuring IP screensaver (phosphor) for managed users..."
+  command -v xscreensaver &>/dev/null || \
+    sudo apt install -y xscreensaver xscreensaver-data xscreensaver-data-extra xscreensaver-gl
 
-  local hn home xs_tmp auto_tmp
-  hn="$(hostname)"
-  home="$(getent passwd "$STUDENT_ACCOUNT" | cut -d: -f6)"
-  sudo install -d -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 755 \
-    "$home/.config/xscreensaver" "$home/.config/autostart"
+  local user_home user
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    user="$(basename "$user_home")"
+    echo "      Screensaver for '$user'..."
 
-  xs_tmp="$(mktemp)"
-  cat > "$xs_tmp" <<EOF
-xscreensaver.file.version: 1.0
-mode:           text
-textMode:       literal
-textLiteral:    $hn
-textFont:       *-fixed-*-*-*-*-20-*-*-*-*-*-*-*
-lock:           True
+    sudo install -d -o "$user" -g "$user" -m 755 "$user_home/.local/bin"
+    sudo tee "$user_home/.local/bin/major-room-saver-text.sh" >/dev/null <<'STXT'
+#!/bin/bash
+# Shown on the screensaver. Prints hostname + current IP only when the box can
+# reach the internet (ping out); otherwise an offline notice (never a stale IP).
+export LC_ALL=C
+hn=$(hostname)
+ifc=$(ip route show default 2>/dev/null | awk '{print $5; exit}')
+ip4=$(ip -4 -o addr show "$ifc" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
+if ping -c1 -W2 google.com >/dev/null 2>&1; then
+  printf '%s\nIP: %s\nonline\n' "$hn" "${ip4:-unknown}"
+else
+  printf '%s\noffline\n' "$hn"
+fi
+STXT
+    sudo chmod 755 "$user_home/.local/bin/major-room-saver-text.sh"
+    sudo chown "$user:$user" "$user_home/.local/bin/major-room-saver-text.sh"
+
+    sudo tee "$user_home/.xscreensaver" >/dev/null <<XSS
 timeout:        0:05:00
 cycle:          0:05:00
-fadeSeconds:    1
-unfadeSeconds:  1
-grabDesktopImages:    True
-grabVideoFrames:      False
 lockTimeout:    0:00:00
-passwdTimeout:  0:00:30
-dpmsEnabled:    False
-EOF
-  sudo install -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 644 \
-    "$xs_tmp" "$home/.config/xscreensaver/XScreenSaver"
-  rm -f "$xs_tmp"
+lock:           False
+mode:           one
+selected:       0
+dpmsEnabled:    True
+dpmsStandby:    0:35:00
+dpmsSuspend:    0:35:00
+dpmsOff:        0:35:00
+textMode:       program
+textProgram:    $user_home/.local/bin/major-room-saver-text.sh
+programs:       phosphor -scale 4 -root
+XSS
+    sudo chown "$user:$user" "$user_home/.xscreensaver"
 
-  auto_tmp="$(mktemp)"
-  cat > "$auto_tmp" <<'EOF'
+    sudo install -d -o "$user" -g "$user" -m 755 "$user_home/.config/autostart"
+    sudo tee "$user_home/.config/autostart/xfce4-screensaver.desktop" >/dev/null <<'D'
+[Desktop Entry]
+Type=Application
+Name=Screensaver
+Exec=xfce4-screensaver
+Hidden=true
+X-GNOME-Autostart-enabled=false
+D
+    sudo tee "$user_home/.config/autostart/xscreensaver.desktop" >/dev/null <<'D'
 [Desktop Entry]
 Type=Application
 Name=XScreenSaver
-Comment=Screensaver with hostname display
-Exec=xscreensaver -no-splash
-Hidden=false
-NoDisplay=false
+Exec=xscreensaver -nosplash
 X-GNOME-Autostart-enabled=true
-EOF
-  sudo install -o "$STUDENT_ACCOUNT" -g "$STUDENT_ACCOUNT" -m 644 \
-    "$auto_tmp" "$home/.config/autostart/xscreensaver.desktop"
-  rm -f "$auto_tmp"
+D
+    sudo chown "$user:$user" \
+      "$user_home/.config/autostart/xfce4-screensaver.desktop" \
+      "$user_home/.config/autostart/xscreensaver.desktop"
+  done
+  return 0
+}
+
+# Apple keyboards (iMacs): make F1-F12 real function keys (fnmode=2) instead of
+# media/brightness keys, so they reach byobu/tmux without holding Fn.
+do_imac_fnkeys() {
+  [[ -e /sys/module/hid_apple/parameters/fnmode ]] || { echo "    [skip] not an Apple keyboard"; return 0; }
+  echo "    Setting Apple keyboard fnmode=2 (F-keys are function keys)..."
+  echo "options hid_apple fnmode=2" | sudo tee /etc/modprobe.d/hid_apple.conf >/dev/null
+  echo 2 | sudo tee /sys/module/hid_apple/parameters/fnmode >/dev/null 2>&1 || true
+  sudo update-initramfs -u >/dev/null 2>&1 || true
+  return 0
+}
+
+# Free F1/F11 in xfce4-terminal so byobu/tmux receive them (empty accel = pass-through).
+do_terminal_accels() {
+  echo "    Freeing xfce4-terminal F-keys for byobu/tmux..."
+  local user_home user
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    user="$(basename "$user_home")"
+    sudo install -d -o "$user" -g "$user" -m 700 "$user_home/.config/xfce4/terminal"
+    sudo tee "$user_home/.config/xfce4/terminal/accels.scm" >/dev/null <<'D'
+(gtk_accel_path "<Actions>/terminal-window/contents" "")
+(gtk_accel_path "<Actions>/terminal-window/fullscreen" "")
+D
+    sudo chown "$user:$user" "$user_home/.config/xfce4/terminal/accels.scm"
+  done
+  return 0
+}
+
+# Thai keyboard layout: us,th with CapsLock toggle (tap=switch, Shift+Caps=CapsLock).
+do_keyboard_thai() {
+  echo "    Adding Thai keyboard layout (us,th; CapsLock toggle)..."
+  local user_home user
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    user="$(basename "$user_home")"
+    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbDisable -n -t bool -s false 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbLayout  -n -t string -s "us,th" 2>/dev/null \
+      || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbLayout -s "us,th" 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbVariant -n -t string -s "," 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -n -t string -s "grp:caps_toggle" 2>/dev/null \
+      || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:caps_toggle" 2>/dev/null || true
+  done
+  if [[ -f /etc/default/keyboard ]]; then
+    sudo sed -i 's/^XKBLAYOUT=.*/XKBLAYOUT="us,th"/' /etc/default/keyboard
+    if grep -q '^XKBOPTIONS=' /etc/default/keyboard; then
+      sudo sed -i 's/^XKBOPTIONS=.*/XKBOPTIONS="grp:caps_toggle"/' /etc/default/keyboard
+    else
+      echo 'XKBOPTIONS="grp:caps_toggle"' | sudo tee -a /etc/default/keyboard >/dev/null
+    fi
+  fi
+  return 0
+}
+
+# Panel keyboard-layout indicator that follows the X group (so CapsLock layout
+# switching updates it). The default "EN" comes from ibus (tracks its own engine,
+# not the xkb group), so disable ibus and add the xfce4-xkb-plugin.
+do_panel_language_indicator() {
+  echo "    Panel keyboard-layout indicator (xfce4-xkb-plugin); disabling ibus..."
+  sudo apt install -y xfce4-xkb-plugin >/dev/null 2>&1 || true
+  local user_home user uid local_panel mx new i
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    user="$(basename "$user_home")"; uid="$(id -u "$user")"
+    printf 'run_im none\n' | sudo tee "$user_home/.xinputrc" >/dev/null
+    sudo chown "$user:$user" "$user_home/.xinputrc"
+    local R=(sudo -u "$user" env DISPLAY=:0 XAUTHORITY="$user_home/.Xauthority" \
+      XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" HOME="$user_home")
+    "${R[@]}" bash -c 'pkill -u "$(id -u)" ibus-daemon 2>/dev/null; true'
+    if "${R[@]}" xfconf-query -c xfce4-panel -p /plugins -lv 2>/dev/null | awk '{print $2}' | grep -qx xkb; then
+      continue
+    fi
+    local_panel=$("${R[@]}" xfconf-query -c xfce4-panel -p /panels 2>/dev/null | sed -n 's/^[[:space:]]*\([0-9]\+\).*/\1/p' | head -1)
+    local_panel=${local_panel:-1}
+    mx=$("${R[@]}" xfconf-query -c xfce4-panel -p /plugins -lv 2>/dev/null | grep -oE 'plugin-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
+    new=$(( ${mx:-0} + 1 ))
+    "${R[@]}" xfconf-query -c xfce4-panel -p "/plugins/plugin-$new" --create -t string -s xkb
+    "${R[@]}" xfconf-query -c xfce4-panel -p "/plugins/plugin-$new/display-type" --create -t uint -s 1 2>/dev/null || true
+    "${R[@]}" xfconf-query -c xfce4-panel -p "/plugins/plugin-$new/group-policy" --create -t uint -s 0 2>/dev/null || true
+    local ids; mapfile -t ids < <("${R[@]}" xfconf-query -c xfce4-panel -p "/panels/panel-$local_panel/plugin-ids" 2>/dev/null \
+                                    | sed -n 's/^[[:space:]]*\([0-9]\+\)[[:space:]]*$/\1/p')
+    local args=(); for i in "${ids[@]}"; do args+=(-t int -s "$i"); done; args+=(-t int -s "$new")
+    "${R[@]}" xfconf-query -c xfce4-panel -p "/panels/panel-$local_panel/plugin-ids" --create --force-array "${args[@]}"
+    "${R[@]}" bash -c 'xfce4-panel -r >/dev/null 2>&1 &' || true
+  done
+  return 0
+}
+
+# ulauncher app launcher: autostart for managed users, Ctrl+Space to toggle.
+do_ulauncher() {
+  echo "    Installing ulauncher (Ctrl+Space launcher)..."
+  if ! command -v ulauncher &>/dev/null; then
+    local ver t
+    ver="$(curl -s https://api.github.com/repos/Ulauncher/Ulauncher/releases/latest | grep -Po '"tag_name": "\K[^"]*')"
+    if [[ -n "$ver" ]]; then
+      t="$(mktemp --suffix=.deb)"
+      if fetch "https://github.com/Ulauncher/Ulauncher/releases/download/${ver}/ulauncher_${ver}_all.deb" "$t"; then
+        sudo apt install -y "$t" || { sudo dpkg -i "$t"; sudo apt-get -y -f install; }
+      fi
+      rm -f "$t"
+    fi
+  fi
+  command -v ulauncher &>/dev/null || { echo "    WARNING: ulauncher install failed."; return 1; }
+  local user_home user
+  for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
+    [[ ! -d "$user_home" ]] && continue
+    user="$(basename "$user_home")"
+    sudo install -d -o "$user" -g "$user" -m 755 "$user_home/.config/autostart"
+    sudo tee "$user_home/.config/autostart/ulauncher.desktop" >/dev/null <<'D'
+[Desktop Entry]
+Type=Application
+Name=Ulauncher
+Comment=Application launcher
+Exec=ulauncher --hide-window --no-window-shadow
+Icon=ulauncher
+Terminal=false
+X-GNOME-Autostart-enabled=true
+D
+    sudo chown "$user:$user" "$user_home/.config/autostart/ulauncher.desktop"
+    # Ctrl+Space toggles ulauncher (XFCE global shortcut).
+    sudo -u "$user" xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary>space" -n -t string -s "ulauncher-toggle" 2>/dev/null \
+      || sudo -u "$user" xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary>space" -s "ulauncher-toggle" 2>/dev/null || true
+  done
+  return 0
+}
+
+# Restrict SSH logins to the maintenance sudoer only (students never SSH in).
+# sshd UNIONS all AllowUsers lines, so make the main config authoritative.
+do_ssh_restrict() {
+  echo "    Restricting SSH to '$SUDOER_ACCOUNT' only..."
+  local main=/etc/ssh/sshd_config
+  sudo cp -a "$main" "${main}.major.bak" 2>/dev/null || true
+  if sudo grep -qiE '^[[:space:]]*AllowUsers' "$main"; then
+    sudo sed -ri "s/^[[:space:]]*AllowUsers.*/AllowUsers ${SUDOER_ACCOUNT}/I" "$main"
+  else
+    printf '\n# major-room: restrict SSH to the maintenance sudoer only\nAllowUsers %s\n' \
+      "$SUDOER_ACCOUNT" | sudo tee -a "$main" >/dev/null
+  fi
+  sudo mkdir -p /etc/ssh/sshd_config.d
+  printf '# major-room: restrict SSH to the maintenance sudoer only\nAllowUsers %s\n' \
+    "$SUDOER_ACCOUNT" | sudo tee /etc/ssh/sshd_config.d/10-major-room.conf >/dev/null
+  if sudo sshd -t 2>/dev/null; then
+    sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true
+  else
+    echo "    WARNING: sshd config invalid; reverting."; sudo cp -a "${main}.major.bak" "$main"
+    return 1
+  fi
   return 0
 }
 
@@ -1019,9 +1192,9 @@ verify_account() {  # verify_account <user>
     echo "    [FAIL] $acct has privileged supplementary group(s): $(id -nG "$acct")"
     VFAIL=$((VFAIL+1))
   else echo "    [ OK ] no privileged supplementary groups"; fi
-  if sudo grep -q '^textLiteral:' "$home/.config/xscreensaver/XScreenSaver" 2>/dev/null; then
-    echo "    [ OK ] hostname screensaver"
-  else echo "    [FAIL] hostname screensaver missing"; VFAIL=$((VFAIL+1)); fi
+  if sudo grep -q 'major-room-saver-text' "$home/.xscreensaver" 2>/dev/null; then
+    echo "    [ OK ] IP screensaver (phosphor + online-only IP)"
+  else echo "    [FAIL] IP screensaver missing"; VFAIL=$((VFAIL+1)); fi
   # Optional per-account extras (warn only — present for both student & sudoer).
   local extra
   for extra in ".config/tinted-shell" ".fzf.bash" ".venv"; do
@@ -1127,7 +1300,12 @@ step "Desktop apps (Brave/WezTerm)" do_xfce_apps
 step "XFCE theme (Numix + dark bg)" do_xfce_theme
 step "XFCE panel"                 do_xfce_panel
 step "Student autologin"          do_enable_student_autologin
-step "Hostname screensaver"       do_hostname_screensaver
+step "IP screensaver (phosphor)"  do_ip_screensaver
+step "iMac function keys"         do_imac_fnkeys
+step "Terminal F-keys (byobu)"    do_terminal_accels
+step "Thai keyboard layout"       do_keyboard_thai
+step "Panel language indicator"   do_panel_language_indicator
+step "ulauncher (Ctrl+Space)"     do_ulauncher
 step "Haskell deps"               do_haskell_deps
 step "GHC ${GHC_VER}"             do_ghc
 step "GHCup"                      do_ghcup
@@ -1146,6 +1324,7 @@ step "GitHub CLI"                 do_gh
 step "Ruby"                       do_ruby
 step "SWI-Prolog"                 do_prolog
 step "Racket"                     do_racket
+step "Restrict SSH to sudoer"     do_ssh_restrict
 
 verify_install
 exit $?
