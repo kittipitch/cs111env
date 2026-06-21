@@ -557,8 +557,15 @@ do_xfce_apps() {
 # reader), OnlyOffice (office suite). OnlyOffice via its apt repo, NOT snap
 # (snapd is disabled on the Veritons).
 do_extra_apps() {
-  echo "    Installing extra apps (pinta, eza, atril, OnlyOffice)..."
-  sudo apt install -y pinta atril
+  echo "    Installing extra apps (atril, eza, Pinta(flatpak), OnlyOffice)..."
+  sudo apt install -y atril
+  # Pinta has no apt candidate on 24.04 -> install via Flatpak/Flathub (works on
+  # Veritons too; snapd is disabled there). Remove any orphaned apt pinta.
+  sudo apt install -y flatpak
+  sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+  sudo flatpak install -y --noninteractive flathub com.github.PintaProject.Pinta || \
+    echo "    WARNING: Pinta flatpak install failed."
+  dpkg -l pinta >/dev/null 2>&1 && sudo apt purge -y pinta 2>/dev/null || true
   # eza: try Ubuntu repo, else the eza-community apt repo.
   if ! sudo apt install -y eza 2>/dev/null; then
     sudo install -d -m 755 /etc/apt/keyrings
