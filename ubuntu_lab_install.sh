@@ -553,6 +553,34 @@ do_xfce_apps() {
   return 0
 }
 
+# Shared extra apps: pinta (image editor), eza (ls replacement), atril (PDF
+# reader), OnlyOffice (office suite). OnlyOffice via its apt repo, NOT snap
+# (snapd is disabled on the Veritons).
+do_extra_apps() {
+  echo "    Installing extra apps (pinta, eza, atril, OnlyOffice)..."
+  sudo apt install -y pinta atril
+  # eza: try Ubuntu repo, else the eza-community apt repo.
+  if ! sudo apt install -y eza 2>/dev/null; then
+    sudo install -d -m 755 /etc/apt/keyrings
+    curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+      | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg 2>/dev/null
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+      | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
+    sudo apt update && sudo apt install -y eza
+  fi
+  dpkg -l exa >/dev/null 2>&1 && sudo apt purge -y exa 2>/dev/null || true  # superseded by eza
+  # OnlyOffice
+  if ! command -v onlyoffice-desktopeditors &>/dev/null; then
+    sudo install -d -m 755 /etc/apt/keyrings
+    curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE \
+      | sudo gpg --dearmor -o /etc/apt/keyrings/onlyoffice.gpg 2>/dev/null
+    echo "deb [signed-by=/etc/apt/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" \
+      | sudo tee /etc/apt/sources.list.d/onlyoffice.list >/dev/null
+    sudo apt update && sudo apt install -y onlyoffice-desktopeditors
+  fi
+  return 0
+}
+
 do_xfce_theme() {
   echo "    Installing XFCE desktop theme..."
   # Install Numix theme and icons
@@ -1327,6 +1355,7 @@ step "ntfy callback mechanism"    do_ntfy_report
 step "Python (numpy/pandas)"      do_python
 step "Sublime Text"               do_sublime
 step "Desktop apps (Brave/WezTerm)" do_xfce_apps
+step "Extra apps (pinta/eza/atril/OnlyOffice)" do_extra_apps
 step "XFCE theme (Numix + dark bg)" do_xfce_theme
 step "XFCE panel"                 do_xfce_panel
 step "Login policy"               do_login_policy
