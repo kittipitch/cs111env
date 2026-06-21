@@ -442,8 +442,8 @@ NTFYEOF
     sudo mkdir -p "$user_home/bin"
     sudo tee "$user_home/bin/major-room-report.sh" > /dev/null <<'REPORTEOF'
 #!/usr/bin/env bash
-# Phone home ONCE per boot: publish this box's current network identity to
-# the self-hosted ntfy server on score_cron (private topic, basic auth).
+# Phone home at boot and every 15 minutes: publish this box's current network
+# identity to the self-hosted ntfy server on score_cron (private topic, basic auth).
 set -u
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/major-room/ntfy.conf"
 [ -r "$CONF" ] || exit 0
@@ -475,12 +475,16 @@ REPORTEOF
     # Create symlink for old crontab path compatibility
     sudo ln -sf "$user_home/bin/major-room-report.sh" "$user_home/major-room-report.sh" 2>/dev/null || true
 
-    # Add @reboot crontab entry
-    local cron_entry="@reboot $user_home/bin/major-room-report.sh"
-    sudo -u "$user" crontab -l 2>/dev/null | grep -q "major-room-report.sh" && \
-      echo "        Crontab entry already exists for '$user'" || \
-      (sudo -u "$user" bash -c "(crontab -l 2>/dev/null; echo '$cron_entry') | crontab -" && \
-       echo "        Added crontab entry for '$user'")
+    # Keep callback frequent. DHCP IPs change, so registry must refresh
+    # even when a box did not reboot cleanly.
+    local reboot_cron="@reboot $user_home/bin/major-room-report.sh"
+    local interval_cron="*/15 * * * * $user_home/bin/major-room-report.sh"
+    (
+      sudo -u "$user" crontab -l 2>/dev/null | grep -v 'major-room-report.sh' || true
+      echo "$reboot_cron"
+      echo "$interval_cron"
+    ) | sudo -u "$user" crontab -
+    echo "        Installed @reboot + */15 callback crontab for '$user'"
   done
 
   # Test reporter once
