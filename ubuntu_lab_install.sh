@@ -1286,6 +1286,8 @@ verify_install() {
   vcrit "HUnit importable"            sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.HUnit"
   vcrit "java"                        java -version
   vcrit "node"                        node -v
+  vcrit "npm"                         npm -v
+  vcrit "npx"                         npx -v
   vcrit "python3"                     python3 --version
   vcrit "mypy"                        mypy --version
   vcrit "Sublime (subl)"             command -v subl
