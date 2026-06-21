@@ -756,6 +756,28 @@ do_enable_student_autologin() {
   return 0
 }
 
+# Login policy. Major-room boxes (cscmu marker): NO autologin, and hide the
+# sudoer from the greeter so students see/choose only the student account (the
+# sudoer still works over SSH). Non-major-room: keep autologin to the student.
+do_login_policy() {
+  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
+  sudo mkdir -p /etc/lightdm/lightdm.conf.d
+  if is_lab_cscmu_machine; then
+    echo "    Major-room login policy: NO autologin; hide '$SUDOER_ACCOUNT' from greeter."
+    local f
+    for f in /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/lightdm.conf; do
+      [ -f "$f" ] && sudo sed -i '/^[[:space:]]*autologin-user=/d; /^[[:space:]]*autologin-user-timeout=/d' "$f"
+    done
+    printf '[Seat:*]\ngreeter-hide-users=false\ngreeter-show-manual-login=false\n' \
+      | sudo tee /etc/lightdm/lightdm.conf.d/50-major-login.conf >/dev/null
+    sudo install -d -m 755 /var/lib/AccountsService/users
+    printf '[User]\nSystemAccount=true\n' | sudo tee "/var/lib/AccountsService/users/$SUDOER_ACCOUNT" >/dev/null
+  else
+    do_enable_student_autologin
+  fi
+  return 0
+}
+
 do_ip_screensaver() {
   # XScreenSaver (phosphor) showing hostname + CURRENT IP, but ONLY when the box
   # can actually reach the internet (so a stale DHCP IP is never displayed).
@@ -1259,7 +1281,15 @@ verify_install() {
     echo "  [FAIL] legacy student account still exists"
     VFAIL=$((VFAIL+1))
   else echo "  [ OK ] legacy student account absent"; fi
-  if grep -hE '^autologin-user=' /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/lightdm.conf 2>/dev/null \
+  if is_lab_cscmu_machine; then
+    # Major-room policy: NO autologin, and the sudoer hidden from the greeter.
+    if grep -hE '^autologin-user=' /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | grep -q .; then
+      echo "  [FAIL] autologin still set (major-room policy is NO autologin)"; VFAIL=$((VFAIL+1))
+    else echo "  [ OK ] no autologin (major-room policy)"; fi
+    if grep -q '^SystemAccount=true' "/var/lib/AccountsService/users/${SUDOER_ACCOUNT}" 2>/dev/null; then
+      echo "  [ OK ] '${SUDOER_ACCOUNT}' hidden from greeter"
+    else echo "  [FAIL] '${SUDOER_ACCOUNT}' not hidden from greeter"; VFAIL=$((VFAIL+1)); fi
+  elif grep -hE '^autologin-user=' /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/lightdm.conf 2>/dev/null \
       | grep -qv "^autologin-user=${STUDENT_ACCOUNT}$"; then
     echo "  [FAIL] LightDM autologin is not consistently ${STUDENT_ACCOUNT}"
     VFAIL=$((VFAIL+1))
@@ -1299,7 +1329,7 @@ step "Sublime Text"               do_sublime
 step "Desktop apps (Brave/WezTerm)" do_xfce_apps
 step "XFCE theme (Numix + dark bg)" do_xfce_theme
 step "XFCE panel"                 do_xfce_panel
-step "Student autologin"          do_enable_student_autologin
+step "Login policy"               do_login_policy
 step "IP screensaver (phosphor)"  do_ip_screensaver
 step "iMac function keys"         do_imac_fnkeys
 step "Terminal F-keys (byobu)"    do_terminal_accels
