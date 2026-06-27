@@ -253,10 +253,28 @@ do_basic_tools() {
   sudo apt install -y \
     tar zip unzip git build-essential bash-completion xz-utils \
     python3-pip python3-venv pipenv pipx mypy \
-    tmux byobu dos2unix xclip fzf \
+    tmux byobu dos2unix xclip wl-clipboard fzf \
     emacs-nox vim neovim bat \
     wget curl gnupg ca-certificates \
     kdiff3
+
+  # Clipboard helper for the byobu copy bindings (~/.byobu/.tmux.conf). Picks
+  # the backend at runtime: Wayland -> wl-copy, X11 -> xsel/xclip. xclip + the
+  # wl-clipboard package above provide both so highlight-copy works either way.
+  sudo tee /usr/local/bin/tmux-clip >/dev/null <<'TMUXCLIP'
+#!/bin/sh
+# tmux-clip — copy stdin to the system clipboard, auto-detecting Wayland vs X11.
+if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
+    exec wl-copy
+elif [ -n "$DISPLAY" ] && command -v xsel >/dev/null 2>&1; then
+    exec xsel -i -b
+elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
+    exec xclip -i -selection clipboard
+else
+    exec cat >/dev/null
+fi
+TMUXCLIP
+  sudo chmod 755 /usr/local/bin/tmux-clip
 }
 
 # Programming fonts (UBUNTU.md §4): FiraCode + IosevkaTerm Nerd Font. The lab

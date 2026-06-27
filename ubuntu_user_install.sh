@@ -36,9 +36,32 @@ sudo timedatectl set-timezone Asia/Bangkok
 echo "==> Installing basic tools..."
 PKGS="tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx mypy tmux byobu dos2unix emacs-nox vim neovim bat wget curl gnupg ca-certificates"
 if [ "$IS_WSL" = false ]; then
-  PKGS="$PKGS xclip kdiff3"
+  # xclip: X11 clipboard. wl-clipboard: Wayland clipboard (wl-copy). Both are
+  # needed so byobu mouse-highlight copy works regardless of session type;
+  # the tmux-clip helper (installed below) picks the right one at runtime.
+  PKGS="$PKGS xclip wl-clipboard kdiff3"
 fi
 sudo apt install -y $PKGS
+
+# Clipboard helper used by the byobu copy bindings (~/.byobu/.tmux.conf).
+# Auto-detects Wayland (wl-copy) vs X11 (xsel/xclip) at runtime.
+if [ "$IS_WSL" = false ]; then
+  echo "==> Installing /usr/local/bin/tmux-clip ..."
+  sudo tee /usr/local/bin/tmux-clip >/dev/null <<'TMUXCLIP'
+#!/bin/sh
+# tmux-clip — copy stdin to the system clipboard, auto-detecting Wayland vs X11.
+if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
+    exec wl-copy
+elif [ -n "$DISPLAY" ] && command -v xsel >/dev/null 2>&1; then
+    exec xsel -i -b
+elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
+    exec xclip -i -selection clipboard
+else
+    exec cat >/dev/null
+fi
+TMUXCLIP
+  sudo chmod 755 /usr/local/bin/tmux-clip
+fi
 
 # ============================================================
 # Dot Files (UBUNTU.md Step 3)
