@@ -933,9 +933,12 @@ D
   return 0
 }
 
-# Thai keyboard layout: us,th with CapsLock toggle (tap=switch, Shift+Caps=CapsLock).
+# Thai keyboard layout: us,th, switch via Win+Space (matches Windows muscle
+# memory) OR CapsLock tap (fallback for keyboards with no distinct Super key;
+# Shift+Caps still gives true CapsLock). Both bind different physical keys so
+# they coexist with no conflict.
 do_keyboard_thai() {
-  echo "    Adding Thai keyboard layout (us,th; CapsLock toggle)..."
+  echo "    Adding Thai keyboard layout (us,th; Win+Space / CapsLock toggle)..."
   local user_home user
   for user_home in "$STUDENT_HOME" "$INSTALLER_HOME"; do
     [[ ! -d "$user_home" ]] && continue
@@ -944,15 +947,15 @@ do_keyboard_thai() {
     sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbLayout  -n -t string -s "us,th" 2>/dev/null \
       || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbLayout -s "us,th" 2>/dev/null || true
     sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbVariant -n -t string -s "," 2>/dev/null || true
-    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -n -t string -s "grp:caps_toggle" 2>/dev/null \
-      || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:caps_toggle" 2>/dev/null || true
+    sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -n -t string -s "grp:win_space_toggle,grp:caps_toggle" 2>/dev/null \
+      || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:win_space_toggle,grp:caps_toggle" 2>/dev/null || true
   done
   if [[ -f /etc/default/keyboard ]]; then
     sudo sed -i 's/^XKBLAYOUT=.*/XKBLAYOUT="us,th"/' /etc/default/keyboard
     if grep -q '^XKBOPTIONS=' /etc/default/keyboard; then
-      sudo sed -i 's/^XKBOPTIONS=.*/XKBOPTIONS="grp:caps_toggle"/' /etc/default/keyboard
+      sudo sed -i 's/^XKBOPTIONS=.*/XKBOPTIONS="grp:win_space_toggle,grp:caps_toggle"/' /etc/default/keyboard
     else
-      echo 'XKBOPTIONS="grp:caps_toggle"' | sudo tee -a /etc/default/keyboard >/dev/null
+      echo 'XKBOPTIONS="grp:win_space_toggle,grp:caps_toggle"' | sudo tee -a /etc/default/keyboard >/dev/null
     fi
   fi
   return 0
