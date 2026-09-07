@@ -606,6 +606,17 @@ OrbStack is a fast, light, and easy replacement for Docker Desktop.
 brew install --cask orbstack
 ```
 
+Open OrbStack once from Applications (or run `open -a OrbStack`) so the engine starts —
+it then starts on its own from that point on. Check it works:
+
+```bash
+docker run --rm hello-world
+docker compose version
+```
+
+Both must succeed. On macOS you do not need `sudo` for Docker, and there is no `docker`
+group to join.
+
 ### 25. Install lazydocker
 
 ```bash

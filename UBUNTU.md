@@ -702,7 +702,21 @@ echo \
 
 sudo apt update
 sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Run docker as yourself, without sudo
+sudo usermod -aG docker $USER
 ```
+
+> [!IMPORTANT]
+> **Log out and log back in** after `usermod` — a new terminal window is not enough,
+> because group membership is attached when you log in. Then check it worked:
+>
+> ```bash
+> docker run --rm hello-world
+> ```
+>
+> That must succeed **without `sudo`**. Course tooling and lab graders run
+> `docker compose` as your normal user, so if this still needs `sudo`, they will fail.
 
 ### 26. Install lazydocker
 
@@ -716,6 +730,11 @@ curl -sLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/release
 tar xfz lazydocker.tar.gz
 sudo mv lazydocker /usr/local/bin
 ```
+
+> [!NOTE]
+> On an ARM machine (Raspberry Pi, ARM VM — check with `uname -m`, which prints
+> `aarch64`), that URL is the wrong architecture: swap `Linux_x86_64` for
+> `Linux_arm64` in the `curl` line.
 
 ### 27. Install fzf
 
