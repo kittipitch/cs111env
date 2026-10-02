@@ -12,7 +12,7 @@ All commands below are typed in **PowerShell** (not as Administrator unless the 
 
 ## Table of Contents
 
-- [Before You Start](#before-you-start)
+- [Before You Start](#before-you-start) (winget, coreutils)
 - [Basic Tools](#basic-tools)
 - [Python](#python)
 - [Sublime Text](#sublime-text)
@@ -21,7 +21,7 @@ All commands below are typed in **PowerShell** (not as Administrator unless the 
 - [C/C++](#cc)
 - [NodeJS, Bun & Go](#nodejs-bun--go)
 - [Docker](#docker)
-- [Additional Tools](#additional-tools)
+- [Additional Tools](#additional-tools) (AI CLIs: agy, claude, codex)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -44,19 +44,90 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Answer `Y` if asked.
 
-### 3. Check winget
+### 3. winget — the Windows package manager (instead of `apt` / `brew`)
 
-`winget` installs programs from the command line. It ships with Windows 10 (21H2+) and Windows 11.
+On Windows, **`winget`** does the job of `apt` (Ubuntu) and `brew` (macOS): it installs, upgrades,
+and removes programs from the command line. Every install in this guide uses it.
+
+#### 3.1 Check that winget is installed
+
+`winget` is part of **App Installer**, which ships with Windows 11 and Windows 10 (1809 or later):
 
 ```powershell
 winget --version
 ```
 
-If it is missing, install **App Installer** from the Microsoft Store.
+If you get *"winget is not recognized"*:
+
+1. Ask Windows to register it (common right after a first login):
+
+   ```powershell
+   Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe
+   ```
+
+2. Still missing? Install or update **App Installer** from the Microsoft Store:
+   <https://apps.microsoft.com/detail/9nblggh4nns1>
+
+Open a new PowerShell window and run `winget --version` again.
+
+#### 3.2 apt / brew → winget cheat sheet
+
+| Task | Ubuntu (`apt`) | macOS (`brew`) | Windows (`winget`) |
+|------|----------------|----------------|--------------------|
+| Find a package | `apt search fzf` | `brew search fzf` | `winget search fzf` |
+| Install | `sudo apt install fzf` | `brew install fzf` | `winget install -e --id junegunn.fzf` |
+| Install a specific version | `sudo apt install pkg=1.2` | `brew install pkg@1.2` | `winget install -e --id Pkg.Id --version 1.2` |
+| List installed | `apt list --installed` | `brew list` | `winget list` |
+| Upgrade everything | `sudo apt upgrade` | `brew upgrade` | `winget upgrade --all` |
+| Uninstall | `sudo apt remove fzf` | `brew uninstall fzf` | `winget uninstall -e --id junegunn.fzf` |
+| Hold a version | `sudo apt-mark hold pkg` | `brew pin pkg` | `winget pin add --id Pkg.Id --version 1.2.*` |
+
+- Always install by **`--id`** with **`-e`** (exact match), as this guide does — names can match several packages.
+- No `sudo`: winget asks for administrator rights (a Windows prompt) only when an installer needs them.
+- The first `winget` command asks you to accept the source agreement — answer `Y`.
 
 > [!IMPORTANT]
 > **Open a NEW PowerShell window after every `winget install`.** A window that was already open
 > does not see the new program on its `PATH`, so the version checks will say "not recognized".
+
+#### 3.3 Linux commands on Windows (coreutils) and a terminal editor
+
+PowerShell has its own commands (`Get-ChildItem`, ...). To get the same `ls`, `cat`, `cp`, `mv`,
+`rm`, `head`, `tail`, `wc`, `sort`, ... that you use on Ubuntu and macOS, install **uutils
+coreutils** (the GNU coreutils rewritten in Rust, built for Windows). Also install **Microsoft
+Edit** (`edit`), a small terminal text editor from Microsoft, like `nano` (newer Windows 11
+builds already include it; installing it again is harmless):
+
+```powershell
+winget install -e --id uutils.coreutils
+winget install -e --id Microsoft.Edit
+```
+
+PowerShell already has built-in *aliases* named `ls`, `cat`, `cp`, ... that would hide the real
+commands. Remove them in your PowerShell profile (runs every time PowerShell starts). The second
+line makes PowerShell pass text to these commands as plain UTF-8 — without it, an invisible
+marker is added to the first line and `sort`, `grep`, ... give wrong results:
+
+```powershell
+if (!(Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force | Out-Null }
+Add-Content $PROFILE @'
+foreach ($a in 'cat','cp','echo','ls','mv','pwd','rm','rmdir','sleep','sort','tee') { Remove-Item "Alias:$a" -Force -ErrorAction SilentlyContinue }
+$OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+'@
+```
+
+Open a new PowerShell window and check:
+
+```powershell
+ls --version      # Should show: ls (uutils coreutils) ...
+ls -la
+"b","a" | sort    # Should print a, then b
+edit --version
+```
+
+> **Note:** after this, `ls`/`rm`/`cp` take Linux-style options (`rm -rf dir`, `ls -la`),
+> not PowerShell ones (`-Recurse`, `-Force`). Use the full PowerShell names
+> (`Get-ChildItem`, `Remove-Item`) when you need the PowerShell behaviour.
 
 ---
 
@@ -92,8 +163,14 @@ KDiff3 helps you compare files and fix merge conflicts.
 winget install -e --id KDE.KDiff3
 ```
 
-Add `C:\Program Files\KDiff3\` and `C:\Program Files\KDiff3\bin` to the Windows Path
-(same steps as [Step 9](#9-install-sublime-text-4)).
+winget installs it for your user only, in `%LOCALAPPDATA%\Programs\KDiff3\bin`. Add that folder
+to your Path:
+
+```powershell
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ";$env:LOCALAPPDATA\Programs\KDiff3\bin", 'User')
+```
+
+Open a new window and check that it is found: `Get-Command kdiff3`
 
 ---
 
@@ -631,7 +708,28 @@ winget install -e --id junegunn.fzf
 winget install -e --id GitHub.cli
 ```
 
-### 26. Verify everything
+### 26. AI command-line tools: Antigravity (`agy`), Claude Code (`claude`), Codex (`codex`)
+
+```powershell
+winget install -e --id Google.AntigravityCLI
+winget install -e --id Anthropic.ClaudeCode
+winget install -e --id OpenAI.Codex
+```
+
+Open a new window and check:
+
+```powershell
+agy --version
+claude --version
+codex --version
+```
+
+- Each tool asks you to sign in the first time you run it (`agy`, `claude`, `codex`).
+- Claude Code uses **Git Bash** from Git for Windows ([Step 5](#5-install-git)) to run commands.
+- winget installs do not auto-update. Update with
+  `winget upgrade -e --id Google.AntigravityCLI` (or `Anthropic.ClaudeCode`, `OpenAI.Codex`).
+
+### 27. Verify everything
 
 Open a new PowerShell window and run:
 
@@ -640,6 +738,7 @@ git --version; python --version; mypy --version; uv --version
 ghc --version; cabal --version; stack --version; ormolu --version
 java -version; g++ --version; node -v; npm -v; npx -v; bun --version; go version
 docker --version; gh --version; fzf --version
+ls --version; edit --version; agy --version; claude --version; codex --version
 ```
 
 Every line should print a version. A "not recognized" error means that step's install did not
@@ -663,6 +762,7 @@ Sublime Text — or sign out and back in.
 
 If you are stuck in a terminal editor:
 
+- **edit** (Microsoft Edit): Press **Ctrl + S** to save, **Ctrl + Q** to exit.
 - **nano**: Press **Ctrl + X**, then **Y**, then **Enter** to save and exit.
 - **vim**: Press **Esc**, then type `:q!` and press **Enter** to exit without saving.
 
