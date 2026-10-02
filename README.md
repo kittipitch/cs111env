@@ -95,8 +95,8 @@ If you cannot install local tools:
 
 | Course | Content | Guide |
 |--------|---------|-------|
-| CS111 | Python | **[GitHub Codespaces (CS111 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#basic-tools), [UBUNTU.md](UBUNTU.md#python), [MACOS.md](MACOS.md#python-312) |
-| CS115 | Haskell | **[GitHub Codespaces (CS115 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#haskell-setup), [UBUNTU.md](UBUNTU.md#haskell), [MACOS.md](MACOS.md#haskell) |
+| CS111 | Python | **[GitHub Codespaces (CS111 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#basic-tools), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#python), [UBUNTU.md](UBUNTU.md#python), [MACOS.md](MACOS.md#python-312) |
+| CS115 | Haskell | **[GitHub Codespaces (CS115 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#haskell-setup), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#haskell), [UBUNTU.md](UBUNTU.md#haskell), [MACOS.md](MACOS.md#haskell) |
 | CS203 | Go, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#nodejs-bun--go) |
 | CS212 | NodeJS, Bun, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#nodejs-bun--go) |
 | CS252 | C/C++ | **[GitHub Codespaces (C/C++ Template)](#browser-based-options)** |

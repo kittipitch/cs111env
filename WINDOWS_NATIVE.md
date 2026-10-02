@@ -104,7 +104,7 @@ Add `C:\Program Files\KDiff3\` and `C:\Program Files\KDiff3\bin` to the Windows 
 **Remove any other Python installations first** (Settings → Apps → search "Python").
 
 ```powershell
-winget install -e --id Python.Python.3.12
+winget install -e --id Python.Python.3.12 --scope user
 ```
 
 Open a new window and check:
@@ -542,6 +542,7 @@ bun --version   # Should show 1.3.11
 
 ```powershell
 winget install -e --id GoLang.Go --version 1.19.13
+winget pin add --id GoLang.Go --version 1.19.13
 ```
 
 Open a new window and check:
@@ -584,14 +585,14 @@ go run hello.go
    Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
    ```
 
-2. Install Docker Desktop:
+2. Install Docker Desktop with the Hyper-V backend:
 
    ```powershell
-   winget install -e --id Docker.DockerDesktop
+   winget install -e --id Docker.DockerDesktop --override "install --backend=hyper-v --quiet --accept-license"
    ```
 
-3. Start Docker Desktop. In **Settings → General**, **uncheck** "Use the WSL 2 based engine",
-   then Apply & Restart.
+3. Start Docker Desktop. In **Settings → General**, make sure "Use the WSL 2 based engine"
+   is **unchecked** (Apply & Restart if you changed it).
 
 4. Let your account use Docker — PowerShell **as Administrator**:
 
