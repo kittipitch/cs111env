@@ -615,7 +615,15 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install nodejs
 ```
 
-**OR Install Bun 1.3.11 (instead of NodeJS):**
+**Check NodeJS, npm, and npx** (the `nodejs` package includes `npm` and `npx`):
+
+```bash
+node -v   # Should start with v24.
+npm -v
+npx -v
+```
+
+**Install Bun 1.3.11 (alongside NodeJS):**
 
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads

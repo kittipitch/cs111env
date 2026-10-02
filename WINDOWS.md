@@ -4,7 +4,7 @@ This guide sets up Windows, Sublime Text, and WSL with Ubuntu 24.04.
 
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
-> **For CS111 (Python) and CS115 (Haskell) only.** For CS200+ courses (Java, C/C++, Go, NodeJS), use [macOS](MACOS.md) or [Ubuntu](UBUNTU.md) instead.
+> **For CS111 (Python) and CS115 (Haskell).** For CS200+ courses (Java, C/C++, Go, NodeJS, Docker), use [Windows (native, no WSL)](WINDOWS_NATIVE.md), [macOS](MACOS.md), or [Ubuntu](UBUNTU.md).
 
 ## Table of Contents
 
@@ -845,6 +845,22 @@ git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf && yes | ~/.fzf/i
 
 ```bash
 sudo apt update && sudo apt install -y gh
+```
+
+### 27. Install NodeJS 24 and Bun (Optional)
+
+Inside WSL. The `nodejs` package includes `npm` and `npx`.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v   # Should start with v24.
+npm -v
+npx -v
+
+curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"
+source ~/.bashrc
+bun --version  # Should show 1.3.11
 ```
 
 ---

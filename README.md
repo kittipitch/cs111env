@@ -5,6 +5,7 @@
 - [Course Coverage](#course-coverage)
 - [Platform Guides](#platform-guides)
   - [Windows + WSL](#windows--wsl)
+  - [Windows (Native, no WSL)](#windows-native-no-wsl)
   - [Ubuntu 24.04](#ubuntu-2404)
   - [macOS](#macos)
 - [Browser-based Options](#browser-based-options)
@@ -14,8 +15,8 @@
 
 | Level | Content | Platform |
 |-------|---------|----------|
-| **100-level** (CS111/CS115) | Python, Haskell | Windows + WSL, macOS, Ubuntu, or **[GitHub Codespaces](#browser-based-options)** |
-| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Docker | macOS, Ubuntu, or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
+| **100-level** (CS111/CS115) | Python, Haskell | Windows + WSL, Windows (native), macOS, Ubuntu, or **[GitHub Codespaces](#browser-based-options)** |
+| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Bun, Docker | Windows (native), macOS, Ubuntu, or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
 
 ## Platform Guides
 
@@ -33,6 +34,17 @@ Complete setup for Windows using Sublime Text with WSL (Ubuntu 24.04) backend.
 - Sublime Text with WSL integration (mypy via WSL, Terminus)
 - Python and Haskell setup
 
+### [Windows (Native, no WSL)](WINDOWS_NATIVE.md)
+
+Setup directly on Windows 10/11 with `winget` — no WSL. Supports all courses.
+
+**Covers:**
+
+- Python 3.12, mypy, Haskell (GHCup, pinned course versions)
+- Java 21, C/C++ (GCC), NodeJS 24 (npm, npx), Bun, Go
+- Docker Desktop (Windows Pro/Education only), fzf, GitHub CLI
+- Sublime Text with mypy, Terminus, and Haskell LSP
+
 ### [Ubuntu 24.04](UBUNTU.md)
 
 Native Ubuntu setup (dual-boot or native Linux). Supports all courses.
@@ -40,7 +52,7 @@ Native Ubuntu setup (dual-boot or native Linux). Supports all courses.
 **Covers:**
 
 - System update and basic tools
-- All programming languages (Python, Haskell, C/C++, Go, NodeJS)
+- All programming languages (Python, Haskell, C/C++, Go, NodeJS, Bun)
 - Docker, fzf, GitHub CLI
 - Sublime Text and VSCode
 
@@ -51,7 +63,7 @@ Setup for macOS users. Supports all courses.
 **Covers:**
 
 - Python 3.12 and Haskell setup
-- All programming languages (C/C++, Go, NodeJS)
+- All programming languages (C/C++, Go, NodeJS, Bun)
 - Sublime Text with mypy and Terminus
 
 ---
@@ -85,6 +97,6 @@ If you cannot install local tools:
 |--------|---------|-------|
 | CS111 | Python | **[GitHub Codespaces (CS111 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#basic-tools), [UBUNTU.md](UBUNTU.md#python), [MACOS.md](MACOS.md#python-312) |
 | CS115 | Haskell | **[GitHub Codespaces (CS115 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#haskell-setup), [UBUNTU.md](UBUNTU.md#haskell), [MACOS.md](MACOS.md#haskell) |
-| CS203 | Go, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#nodejs--go) |
-| CS212 | NodeJS, Bun, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#nodejs--go) |
+| CS203 | Go, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#nodejs-bun--go) |
+| CS212 | NodeJS, Bun, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages), [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md#nodejs-bun--go) |
 | CS252 | C/C++ | **[GitHub Codespaces (C/C++ Template)](#browser-based-options)** |

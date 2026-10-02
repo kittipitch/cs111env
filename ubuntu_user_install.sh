@@ -228,13 +228,14 @@ echo "==> Installing NodeJS 24 LTS..."
 sudo apt install -y curl gnupg ca-certificates
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
+node -v && npm -v && npx -v
 
 # ============================================================
-# Bun 1.3.11 (alternative to NodeJS)
+# Bun 1.3.11 (alongside NodeJS)
 # ============================================================
 
 if ! command -v bun &> /dev/null; then
-  echo "==> Installing Bun 1.3.11 (alternative to NodeJS)..."
+  echo "==> Installing Bun 1.3.11..."
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
   wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip --no-check-certificate
@@ -242,6 +243,7 @@ if ! command -v bun &> /dev/null; then
   sudo cp bun-linux-x64/bun /usr/bin/
   cd ~
 fi
+bun --version
 
 # ============================================================
 # Go Setup (UBUNTU.md Step 22)

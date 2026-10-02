@@ -566,6 +566,27 @@ echo 'export PATH="/opt/homebrew/opt/node@24/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
+> **Intel Mac:** Homebrew lives in `/usr/local`, so use
+> `/usr/local/opt/node@24/bin` in the `PATH` line instead.
+
+Check NodeJS, npm, and npx (`node@24` includes `npm` and `npx`):
+
+```bash
+node -v   # Should start with v24.
+npm -v
+npx -v
+```
+
+### 20.1 Bun Setup
+
+Install Bun 1.3.11 (same version as the Ubuntu and Windows guides):
+
+```bash
+curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"
+source ~/.zshrc
+bun --version  # Should show 1.3.11
+```
+
 ### 21. Go Setup
 
 ```bash

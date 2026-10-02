@@ -63,6 +63,7 @@ STACK_VER="3.7.1"
 HLS_VER="2.13.0.0"
 HUNIT_VER="1.6.2.0"
 ORMOLU_VER="0.7.2.0"
+BUN_VER="1.3.11"
 GHC_ENV="/usr/local/lib/ghc-${GHC_VER}/lib/ghc.env"
 GHC_PKGDB="/usr/local/lib/ghc-${GHC_VER}/lib/package.conf.d"
 CABAL_PKGDB="/usr/local/lib/ghc-${GHC_VER}/cabal-store/ghc-${GHC_VER}/package.db"
@@ -1143,9 +1144,20 @@ do_hls() {
 do_java() { sudo apt install -y openjdk-21-jdk; }
 
 do_node() {
-  command -v node &>/dev/null && node -v | grep -q '^v2[4-9]' && { echo "    node already current."; return 0; }
+  command -v node &>/dev/null && node -v | grep -q '^v24\.' && { echo "    node already current."; return 0; }
   curl -fsSL --retry 3 https://deb.nodesource.com/setup_24.x | sudo -E bash - \
     && sudo apt install -y nodejs
+}
+
+do_bun() {
+  command -v bun &>/dev/null && [[ "$(bun --version)" == "$BUN_VER" ]] && { echo "    bun already current."; return 0; }
+  mkdir -p ~/Downloads; cd ~/Downloads || return 1
+  fetch "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VER}/bun-linux-x64.zip" bun.zip || {
+    echo "    WARNING: Bun download failed."; cd ~; return 1; }
+  unzip -qo bun.zip && sudo install -m 0755 bun-linux-x64/bun /usr/local/bin/bun
+  local rc=$?
+  cd ~
+  return $rc
 }
 
 do_go() {
@@ -1306,9 +1318,10 @@ verify_install() {
   vcrit "HLS typecheck a .hs file"    verify_hls_typecheck
   vcrit "HUnit importable"            sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.HUnit"
   vcrit "java"                        java -version
-  vcrit "node"                        node -v
+  vver  "node"     "v24."              node -v
   vcrit "npm"                         npm -v
   vcrit "npx"                         npx -v
+  vver  "bun"      "$BUN_VER"          bun --version
   vcrit "python3"                     python3 --version
   vcrit "mypy"                        mypy --version
   vcrit "Sublime (subl)"             command -v subl
@@ -1405,6 +1418,7 @@ step "Ormolu"                     do_ormolu
 step "Haskell Language Server"    do_hls
 step "Java (OpenJDK 21)"          do_java
 step "NodeJS 24"                  do_node
+step "Bun ${BUN_VER}"              do_bun
 step "Go 1.19.13"                 do_go
 step "Docker"                     do_docker
 step "lazydocker"                 do_lazydocker
