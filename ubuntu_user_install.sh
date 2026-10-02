@@ -90,7 +90,7 @@ echo "==> Installing programming fonts..."
 sudo apt install -y fonts-firacode 2>/dev/null || true
 
 # IosevkaTerm Nerd Font (optional, prettier)
-cd ~/Downloads 2>/dev/null || cd ~/ && cd Downloads
+cd ~/Downloads 2>/dev/null || cd ~/ && cd ~/Downloads
 wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip 2>/dev/null || true
 if [ -f IosevkaTerm.zip ]; then
   unzip -q IosevkaTerm.zip -d iosevka
