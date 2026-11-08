@@ -1259,11 +1259,42 @@ do_go() {
   cd ~
 }
 
+# One daemon only: docker-ce from Docker's repo, driven by the CLI and lazydocker.
+# Docker Desktop, snap docker and docker.io would each bring a second daemon.
+# docker.io and podman-docker are removed, not purged, so /var/lib/docker survives.
+# Docker Desktop's images live in its own VM and are lost with it.
+remove_other_dockers() {
+  local p
+  for p in docker-desktop docker.io podman-docker; do
+    if dpkg -s "$p" &>/dev/null; then
+      echo "    Removing $p (one Docker daemon only)..."
+      sudo apt remove -y "$p"
+    fi
+  done
+  if snap list docker &>/dev/null; then
+    echo "    Removing snap docker (one Docker daemon only)..."
+    sudo snap remove --purge docker
+  fi
+  hash -r
+}
+
+# Passes only with docker-ce as the single running daemon (rootless would add one).
+verify_one_docker_daemon() {
+  local p
+  dpkg -s docker-ce &>/dev/null || return 1
+  for p in docker-desktop docker.io podman-docker; do
+    dpkg -s "$p" &>/dev/null && return 1
+  done
+  snap list docker &>/dev/null && return 1
+  [[ "$(pgrep -xc dockerd)" == "1" ]]
+}
+
 do_docker() {
   if is_lab_cscmu_machine; then
     echo "    [skip] cscmu lab machine: Docker is intentionally not installed."
     return 0
   fi
+  remove_other_dockers
   if command -v docker &>/dev/null; then
     echo "    docker already installed; ensuring service."
     sudo systemctl enable --now docker 2>/dev/null || true
@@ -1420,7 +1451,8 @@ verify_install() {
   vopt  "go"                          go version
   if [[ "$DESKTOP" == "gnome" ]]; then
     vcrit "docker"                    docker --version  # needed by course 204212
-    vopt  "lazydocker"                lazydocker --version
+    vcrit "lazydocker"                lazydocker --version
+    vcrit "one Docker daemon (docker-ce only)" verify_one_docker_daemon
   elif is_lab_cscmu_machine; then
     echo "  [skip] Skipping Docker verification on cscmu lab machine"
     echo "  [skip] Skipping lazydocker verification on cscmu lab machine"
