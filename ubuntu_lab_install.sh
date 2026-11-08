@@ -139,7 +139,8 @@ fetch() {  # fetch <url> <dest>
 is_lab_cscmu_machine() {
   # "cscmu" marks the slow CS major room machines that must not run Docker.
   # Other account policy must continue to use SUDOER_ACCOUNT/STUDENT_ACCOUNT.
-  id cscmu &>/dev/null
+  # GNOME lab boxes also have cscmu as sudoer but need Docker (course 204212).
+  [[ "$DESKTOP" == "xfce" ]] && id cscmu &>/dev/null
 }
 
 is_veriton_machine() {
@@ -1417,7 +1418,10 @@ verify_install() {
   echo ""
   echo " VERIFICATION (OPTIONAL)"
   vopt  "go"                          go version
-  if is_lab_cscmu_machine; then
+  if [[ "$DESKTOP" == "gnome" ]]; then
+    vcrit "docker"                    docker --version  # needed by course 204212
+    vopt  "lazydocker"                lazydocker --version
+  elif is_lab_cscmu_machine; then
     echo "  [skip] Skipping Docker verification on cscmu lab machine"
     echo "  [skip] Skipping lazydocker verification on cscmu lab machine"
   else
