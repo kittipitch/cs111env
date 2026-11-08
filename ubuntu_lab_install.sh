@@ -132,7 +132,8 @@ only_on() {
 # Download to a file with retries; return non-zero (and leave no partial file)
 # if the result is empty. Prevents empty keys/tarballs from poisoning things.
 fetch() {  # fetch <url> <dest>
-  curl -fsSL --retry 3 --retry-delay 2 -o "$2" "$1" || return 1
+  # --speed-time: a server that accepts and then says nothing would otherwise hang the run.
+  curl -fsSL --retry 3 --retry-delay 2 --speed-time 60 --speed-limit 1024 -o "$2" "$1" || return 1
   [[ -s "$2" ]] || { rm -f "$2"; return 1; }
 }
 
@@ -341,7 +342,8 @@ do_fonts() {
 # /usr/local/bin; each managed account gets a ~/.venv (created in install_dotfiles).
 do_uv() {
   command -v uv &>/dev/null && { echo "    uv already installed."; return 0; }
-  curl -LsSf https://astral.sh/uv/install.sh | sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh
+  curl -LsSf --retry 3 --speed-time 60 --speed-limit 1 https://astral.sh/uv/install.sh | sudo env UV_UNMANAGED_INSTALL="/usr/local/bin" sh
+  command -v uv &>/dev/null || { echo "    [FAIL] uv did not install."; return 1; }
 }
 
 # lazydocker — terminal UI for Docker (UBUNTU.md §26), global binary.
@@ -1250,7 +1252,7 @@ do_java() { sudo apt install -y openjdk-21-jdk; }
 
 do_node() {
   command -v node &>/dev/null && node -v | grep -q '^v24\.' && { echo "    node already current."; return 0; }
-  curl -fsSL --retry 3 https://deb.nodesource.com/setup_24.x | sudo -E bash -
+  curl -fsSL --retry 3 --speed-time 60 --speed-limit 1 https://deb.nodesource.com/setup_24.x | sudo -E bash -
   sudo apt install -y nodejs
   # The pipe hides a failed setup, and apt then installs Ubuntu's older Node.
   node -v 2>/dev/null | grep -q '^v24\.' || { echo "    [FAIL] node is $(node -v 2>/dev/null), wanted v24."; return 1; }
