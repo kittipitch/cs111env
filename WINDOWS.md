@@ -354,7 +354,9 @@ These are common tools used by Python, Haskell, and command-line programs.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx tmux byobu mypy dos2unix emacs-nox vim neovim bat wget curl gnupg ca-certificates
+sudo apt install -y tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx tmux byobu mypy dos2unix vim neovim bat wget curl gnupg ca-certificates
+# emacs-nox would otherwise add a mail server that this course does not need
+sudo apt install -y --no-install-recommends emacs-nox
 ```
 
 ### 11. Install basic dot files

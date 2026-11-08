@@ -34,7 +34,7 @@ sudo timedatectl set-timezone Asia/Bangkok
 # ============================================================
 
 echo "==> Installing basic tools..."
-PKGS="tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx mypy tmux byobu dos2unix emacs-nox vim neovim bat wget curl gnupg ca-certificates"
+PKGS="tar zip unzip git build-essential bash-completion xz-utils python3-pip python3-venv pipenv pipx mypy tmux byobu dos2unix vim neovim bat wget curl gnupg ca-certificates"
 if [ "$IS_WSL" = false ]; then
   # xclip: X11 clipboard. wl-clipboard: Wayland clipboard (wl-copy). Both are
   # needed so byobu mouse-highlight copy works regardless of session type;
@@ -42,6 +42,8 @@ if [ "$IS_WSL" = false ]; then
   PKGS="$PKGS xclip wl-clipboard kdiff3"
 fi
 sudo apt install -y $PKGS
+# emacs-nox would otherwise add a mail server that this course does not need
+sudo apt install -y --no-install-recommends emacs-nox
 
 # Clipboard helper used by the byobu copy bindings (~/.byobu/.tmux.conf).
 # Auto-detects Wayland (wl-copy) vs X11 (xsel/xclip) at runtime.
