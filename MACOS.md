@@ -25,6 +25,17 @@ This guide sets up macOS, Sublime Text, Python, and Haskell.
 
 ---
 
+## Install everything with one script
+
+[`macos_user_install.sh`](macos_user_install.sh) runs the steps in this guide for you, except for the Sublime Text package setup in steps 9, 13, 14 and 16. It works with the `bash` your Mac already has, so you do not need to upgrade anything first. You may be asked for your password once, by Homebrew.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/kittipitch/cs111env/main/macos_user_install.sh
+bash macos_user_install.sh
+```
+
+It is safe to run again. It does not upgrade what you already have, and it does not overwrite your dot files. To follow the steps by hand instead, continue below.
+
 ## System Setup
 
 ### 1. Install Homebrew
@@ -35,6 +46,17 @@ If you haven't already, install Homebrew:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Then make `brew` available in every new terminal:
+
+```bash
+# For Apple Silicon (M1/M2/M3):
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zshrc
+# OR for Intel Macs:
+# echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zshrc
+
+source ~/.zshrc
 ```
 
 ### 2. Install basic tools
@@ -52,20 +74,17 @@ These settings make the terminal easier to use in this course.
 ```bash
 git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
 cd /tmp/temp/
-# Note: On macOS, we only move the config files that are compatible
-cp .bash_profile ~/
-cp .dircolors ~/
-cp .gitconfig ~/
-cp -r .emacs.d ~/
-cp -r .config ~/
-source ~/.bash_profile
+# -n keeps a file you already have
+cp -n .dircolors .gitconfig ~/
+cp -rn .emacs.d ~/
 cd
 ```
+
+> **Note:** A Mac terminal uses `zsh`, which reads `~/.zshrc` and not `~/.bash_profile`. That is why this guide adds settings to `~/.zshrc`.
 
 ### 4. Install programming fonts
 
 ```bash
-brew tap homebrew/cask-fonts
 brew install --cask font-fira-code font-iosevka-nerd-font
 ```
 
@@ -558,6 +577,10 @@ This checks formatting and error messages inside Sublime Text.
 
 ```bash
 brew install openjdk@21
+# For Intel Macs, use /usr/local/opt instead of /opt/homebrew/opt
+echo 'export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+java -version   # Should show version "21...
 ```
 
 ### 20. C/C++ Setup
@@ -566,15 +589,20 @@ brew install openjdk@21
 brew install gcc
 ```
 
-For using g++-1x as the default compiler on macOS:
+Homebrew installs GNU gcc with a version in its name, such as `gcc-16`. To use it when you type `gcc` and `g++`, add aliases (change `16` to the version you have):
 
 ```bash
-brew upgrade
-sudo rm /usr/local/bin/gcc
-sudo rm /usr/local/bin/g++
-sudo ln -s /opt/homebrew/bin/gcc-1* /usr/local/bin/gcc
-sudo ln -s /opt/homebrew/bin/g++-1* /usr/local/bin/g++
+echo 'alias gcc=gcc-16' >> ~/.zshrc
+echo 'alias g++=g++-16' >> ~/.zshrc
+source ~/.zshrc
+g++ --version   # Should mention GCC
 ```
+
+> **Warning:** Do not make a `gcc` symlink in `/usr/local/bin` or elsewhere on your `PATH`. GHC needs plain `gcc` to be Apple's clang, so that symlink breaks Haskell compiling (see step 17). If you made one by following an older version of this guide, remove it:
+>
+> ```bash
+> sudo rm /usr/local/bin/gcc /usr/local/bin/g++
+> ```
 
 ### 21. NodeJS Setup
 
