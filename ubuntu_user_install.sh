@@ -245,7 +245,7 @@ if ! command -v bun &> /dev/null; then
   cd ~/Downloads
   wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip --no-check-certificate
   unzip -q bun-linux-x64.zip
-  sudo cp bun-linux-x64/bun /usr/bin/
+  sudo cp bun-linux-x64/bun /usr/local/bin/
   cd ~
 fi
 bun --version
@@ -394,7 +394,7 @@ if [ "$LAB_MACHINE" = true ]; then
     wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh
     chmod +x racket-minimal-8.12-x86_64-linux-bc.sh
     sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh
-    sudo ln -s /usr/racket/bin/* /usr/bin/
+    sudo ln -s /usr/racket/bin/* /usr/local/bin/
     cd ~
   fi
 fi

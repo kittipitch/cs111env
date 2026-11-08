@@ -499,6 +499,24 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    runghc Hello.hs
    ```
 
+   > **macOS troubleshooting — `gcc` errors when running `ghc` (compile):**
+   > macOS does not ship GNU gcc — `/usr/bin/gcc` is really Apple's clang, which
+   > is what GHC expects. If `ghc SomeFile.hs` fails with
+   > `gcc: error: unrecognized command-line option '--target=...'`
+   > then something earlier on your `PATH` (usually a GNU gcc installed under
+   > `~/.local` or another prefix) is shadowing Apple's clang. Check with
+   > `which gcc`. Fix by pointing GHC's own settings back at clang (one time):
+
+   ```bash
+   SETTINGS="$(ghc --print-libdir)/lib/settings"
+   cp "$SETTINGS" "$SETTINGS.bak"
+   sed -i '' 's/, "gcc")/, "clang")/g; s/, "g++")/, "clang++")/g' "$SETTINGS"
+   ```
+
+   (Keeping GNU gcc installed is fine — Homebrew installs it as `gcc-16`,
+   which never shadows the plain `gcc` name. The conflict only comes from
+   unversioned gcc copies on `PATH`.)
+
 ### 18. Verify Ormolu and LSP
 
 After the basic test works, create `TestSetup.hs` to test LSP.
@@ -536,13 +554,13 @@ This checks formatting and error messages inside Sublime Text.
 
 ## Other Languages
 
-### 18. Java Setup
+### 19. Java Setup
 
 ```bash
 brew install openjdk@21
 ```
 
-### 19. C/C++ Setup
+### 20. C/C++ Setup
 
 ```bash
 brew install gcc
@@ -558,7 +576,7 @@ sudo ln -s /opt/homebrew/bin/gcc-1* /usr/local/bin/gcc
 sudo ln -s /opt/homebrew/bin/g++-1* /usr/local/bin/g++
 ```
 
-### 20. NodeJS Setup
+### 21. NodeJS Setup
 
 ```bash
 brew install node@24
@@ -577,7 +595,7 @@ npm -v
 npx -v
 ```
 
-### 20.1 Bun Setup
+### 21.1 Bun Setup
 
 Install Bun 1.3.11 (same version as the Ubuntu and Windows guides):
 
@@ -587,13 +605,13 @@ source ~/.zshrc
 bun --version  # Should show 1.3.11
 ```
 
-### 21. Go Setup
+### 22. Go Setup
 
 ```bash
 brew install go
 ```
 
-### 22. Hello World in Go
+### 23. Hello World in Go
 
 `hello.go`:
 
@@ -615,11 +633,11 @@ go run hello.go
 
 ## Additional Tools
 
-### 23. VSCode Installation
+### 24. VSCode Installation
 
 Download: <https://code.visualstudio.com/download>
 
-### 24. Install OrbStack (Docker for Mac)
+### 25. Install OrbStack (Docker for Mac)
 
 OrbStack is a fast, light, and easy replacement for Docker Desktop.
 
@@ -638,20 +656,20 @@ docker compose version
 Both must succeed. On macOS you do not need `sudo` for Docker, and there is no `docker`
 group to join.
 
-### 25. Install lazydocker
+### 26. Install lazydocker
 
 ```bash
 brew install jesseduffield/lazydocker/lazydocker
 ```
 
-### 26. Install fzf
+### 27. Install fzf
 
 ```bash
 brew install fzf
 $(brew --prefix)/opt/fzf/install
 ```
 
-### 27. Install GitHub CLI
+### 28. Install GitHub CLI
 
 ```bash
 brew install gh

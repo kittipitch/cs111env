@@ -399,6 +399,9 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    ```bash
    stack install ormolu-0.7.2.0 --resolver lts-22.44
    ```
+   > Note: the version (0.7.2.0) is what matters — the same version is also
+   > installed system-wide via `cabal` on lab machines, so formatting output is
+   > identical everywhere. Do not mix ormolu versions across machines.
 
    Check that Haskell Language Server and Ormolu are available:
 
@@ -630,7 +633,7 @@ npx -v
 cd ~/Downloads
 wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip --no-check-certificate
 unzip bun-linux-x64.zip
-sudo cp bun-linux-x64/bun /usr/bin/
+sudo cp bun-linux-x64/bun /usr/local/bin/
 bun --version  # Should show 1.3.11
 ```
 
