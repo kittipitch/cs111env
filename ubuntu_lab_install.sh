@@ -38,9 +38,25 @@
 #
 # Change these to match your site before running. Each can also be overridden
 # at run time via an environment variable, e.g. for non-interactive automation:
-#   STUDENT_ACCOUNT=csmajor SUDOER_ACCOUNT=cscmu bash ubuntu_lab_install.sh
+#   DESKTOP=xfce STUDENT_ACCOUNT=csmajor SUDOER_ACCOUNT=cscmu bash ubuntu_lab_install.sh
+#
+#   DESKTOP          REQUIRED. Which kind of machine this is:
+#                      xfce   csmajor room public computers (account csmajor)
+#                      gnome  lab computers for class and exams (account student)
+#                    There is no default and no autodetection on purpose: the xfce
+#                    path deletes any account named `student`, which on a lab box is
+#                    the real account, and XFCE boxes can also have gnome-shell.
+case "${DESKTOP:-}" in
+  xfce)  DEFAULT_STUDENT_ACCOUNT="csmajor" ;;
+  gnome) DEFAULT_STUDENT_ACCOUNT="student" ;;
+  *)
+    echo "ERROR: set DESKTOP=xfce (csmajor room) or DESKTOP=gnome (lab, class and exam)." >&2
+    echo "  e.g. DESKTOP=gnome SUDOER_ACCOUNT=<admin> bash ubuntu_lab_install.sh" >&2
+    exit 2
+    ;;
+esac
 SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-cscmu}"
-STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-csmajor}"
+STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-$DEFAULT_STUDENT_ACCOUNT}"
 
 # Password used when this script has to CREATE the student account.
 # Public repo rule: never store the lab password here. Pass STUDENT_PASSWORD
@@ -87,6 +103,7 @@ step() {
   local label="$1"; shift
   echo ""
   echo "==> ${label}..."
+  [[ -n "${LAB_DRY_RUN:-}" ]] && return 0  # list steps only (tests/test_lab_desktop_flag.sh)
   if "$@"; then
     STEP_RESULTS+=("PASS|${label}")
   else
@@ -94,6 +111,13 @@ step() {
     STEP_RESULTS+=("FAIL|${label} (rc=${rc})")
     echo "    [WARN] '${label}' failed (rc=${rc}); continuing."
   fi
+}
+
+# only_on <xfce|gnome> "Label" cmd...   — a step for one desktop; SKIP on the other.
+only_on() {
+  local want="$1"; shift
+  if [[ "$DESKTOP" == "$want" ]]; then step "$@"
+  else STEP_RESULTS+=("SKIP|$1 (${want} only)"); fi
 }
 
 # Download to a file with retries; return non-zero (and leave no partial file)
@@ -164,7 +188,8 @@ do_disable_veriton_slow_boot_services() {
 setup_student_account() {
   # Remove the image-default account before creating/fixing csmajor. On the
   # Veritons it owned UID 1001, which prevented a consistent csmajor UID.
-  if [[ "$STUDENT_ACCOUNT" != "student" ]] && id student &>/dev/null; then
+  # XFCE only: on GNOME lab boxes `student` is the real account (reset_student.sh).
+  if [[ "$DESKTOP" == "xfce" && "$STUDENT_ACCOUNT" != "student" ]] && id student &>/dev/null; then
     echo "    Removing legacy 'student' account..."
     sudo loginctl terminate-user student 2>/dev/null || true
     sudo pkill -KILL -u student 2>/dev/null || true
@@ -810,6 +835,24 @@ do_enable_student_autologin() {
   return 0
 }
 
+# GNOME lab boxes: GDM autologin, same result as reset_student.sh but keeping any
+# other settings in the file. Takes effect on the next GDM start; restarting it here
+# would kill the session this script is running in.
+do_gdm_autologin() {
+  local cfg="${GDM_CUSTOM_CONF:-/etc/gdm3/custom.conf}"
+  id "$STUDENT_ACCOUNT" &>/dev/null || { echo "    [skip] '$STUDENT_ACCOUNT' missing"; return 1; }
+  echo "    Enabling GDM autologin for '$STUDENT_ACCOUNT'..."
+  sudo mkdir -p "$(dirname "$cfg")"
+  if [[ -f "$cfg" ]]; then
+    [[ -f "${cfg}.lab.bak" ]] || sudo cp -a "$cfg" "${cfg}.lab.bak"
+  else
+    printf '[daemon]\n' | sudo tee "$cfg" >/dev/null
+  fi
+  grep -q '^\[daemon\]' "$cfg" || sudo sed -i '1i [daemon]' "$cfg"
+  sudo sed -i -E '/^[[:space:]]*#?[[:space:]]*AutomaticLogin(Enable)?[[:space:]]*=/d' "$cfg"
+  sudo sed -i "/^\[daemon\]/a AutomaticLoginEnable=true\nAutomaticLogin=${STUDENT_ACCOUNT}" "$cfg"
+}
+
 # Login policy. Major-room boxes (cscmu marker): NO autologin, and hide the
 # sudoer from the greeter so students see/choose only the student account (the
 # sudoer still works over SSH). Non-major-room: keep autologin to the student.
@@ -951,6 +994,38 @@ do_keyboard_thai() {
     sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -n -t string -s "grp:win_space_toggle,grp:caps_toggle" 2>/dev/null \
       || sudo -u "$user" xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group -s "grp:win_space_toggle,grp:caps_toggle" 2>/dev/null || true
   done
+  set_system_keyboard
+  return 0
+}
+
+# GNOME: same layouts, set in a LOCKED system dconf db. A lock is required: the
+# reset_student.sh golden master carries a user-level sources=[('xkb','us')] that
+# beats an unlocked system default (measured on the 24.04 VM, 2026-11-08). Only
+# caps_toggle goes in xkb-options because GNOME already binds Super+Space itself.
+do_keyboard_thai_gnome() {
+  echo "    Adding Thai keyboard layout (us,th; locked system dconf)..."
+  command -v dconf &>/dev/null || sudo apt install -y dconf-cli
+  sudo install -d /etc/dconf/profile /etc/dconf/db/local.d/locks
+  if [[ ! -f /etc/dconf/profile/user ]]; then
+    printf 'user-db:user\nsystem-db:local\n' | sudo tee /etc/dconf/profile/user >/dev/null
+  elif ! grep -qx 'system-db:local' /etc/dconf/profile/user; then
+    echo 'system-db:local' | sudo tee -a /etc/dconf/profile/user >/dev/null
+  fi
+  sudo tee /etc/dconf/db/local.d/00-lab-thai >/dev/null <<'D'
+[org/gnome/desktop/input-sources]
+sources=[('xkb', 'us'), ('xkb', 'th')]
+xkb-options=['grp:caps_toggle']
+D
+  sudo tee /etc/dconf/db/local.d/locks/lab-thai >/dev/null <<'D'
+/org/gnome/desktop/input-sources/sources
+/org/gnome/desktop/input-sources/xkb-options
+D
+  sudo dconf update || return 1
+  set_system_keyboard
+  return 0
+}
+
+set_system_keyboard() {
   if [[ -f /etc/default/keyboard ]]; then
     sudo sed -i 's/^XKBLAYOUT=.*/XKBLAYOUT="us,th"/' /etc/default/keyboard
     if grep -q '^XKBOPTIONS=' /etc/default/keyboard; then
@@ -1037,6 +1112,8 @@ D
 # Restrict SSH logins to the maintenance sudoer only (students never SSH in).
 # sshd UNIONS all AllowUsers lines, so make the main config authoritative.
 do_ssh_restrict() {
+  # A missing account here would lock every admin out of SSH.
+  id "$SUDOER_ACCOUNT" &>/dev/null || { echo "    [FAIL] SUDOER_ACCOUNT '$SUDOER_ACCOUNT' does not exist; SSH left unchanged."; return 1; }
   echo "    Restricting SSH to '$SUDOER_ACCOUNT' only..."
   local main=/etc/ssh/sshd_config
   sudo cp -a "$main" "${main}.major.bak" 2>/dev/null || true
@@ -1282,7 +1359,9 @@ verify_account() {  # verify_account <user>
     echo "    [FAIL] $acct has privileged supplementary group(s): $(id -nG "$acct")"
     VFAIL=$((VFAIL+1))
   else echo "    [ OK ] no privileged supplementary groups"; fi
-  if sudo grep -q 'major-room-saver-text' "$home/.xscreensaver" 2>/dev/null; then
+  if [[ "$DESKTOP" != "xfce" ]]; then
+    :  # the IP screensaver is an XFCE room feature
+  elif sudo grep -q 'major-room-saver-text' "$home/.xscreensaver" 2>/dev/null; then
     echo "    [ OK ] IP screensaver (phosphor + online-only IP)"
   else echo "    [FAIL] IP screensaver missing"; VFAIL=$((VFAIL+1)); fi
   # Optional per-account extras (warn only — present for both student & sudoer).
@@ -1348,11 +1427,18 @@ verify_install() {
 
   echo ""
   echo " DOT FILES / SETTINGS PER ACCOUNT"
-  if id student &>/dev/null; then
+  if [[ "$DESKTOP" == "gnome" ]]; then
+    vcrit "GDM autologin -> ${STUDENT_ACCOUNT}" \
+      grep -Eq "^[[:space:]]*AutomaticLogin[[:space:]]*=[[:space:]]*${STUDENT_ACCOUNT}[[:space:]]*$" /etc/gdm3/custom.conf
+    vcrit "Thai layout seen by ${STUDENT_ACCOUNT}" \
+      bash -c "sudo -u '${STUDENT_ACCOUNT}' env HOME='${STUDENT_HOME}' gsettings get org.gnome.desktop.input-sources sources | grep -q \"'th'\""
+  elif id student &>/dev/null; then
     echo "  [FAIL] legacy student account still exists"
     VFAIL=$((VFAIL+1))
   else echo "  [ OK ] legacy student account absent"; fi
-  if is_lab_cscmu_machine; then
+  if [[ "$DESKTOP" == "gnome" ]]; then
+    :  # LightDM checks below are XFCE room only
+  elif is_lab_cscmu_machine; then
     # Major-room policy: NO autologin, and the sudoer hidden from the greeter.
     if grep -hE '^autologin-user=' /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | grep -q .; then
       echo "  [FAIL] autologin still set (major-room policy is NO autologin)"; VFAIL=$((VFAIL+1))
@@ -1386,6 +1472,7 @@ verify_install() {
 # Main
 # ============================================================
 echo "Ubuntu lab setup — resilient run (continues on errors, verifies at end)."
+echo "DESKTOP=${DESKTOP} STUDENT_ACCOUNT=${STUDENT_ACCOUNT} SUDOER_ACCOUNT=${SUDOER_ACCOUNT}"
 
 step "Student account"            setup_student_account
 step "Restricted student policy"  do_student_policy
@@ -1399,15 +1486,17 @@ step "Python (numpy/pandas)"      do_python
 step "Sublime Text"               do_sublime
 step "Desktop apps (Brave/WezTerm)" do_xfce_apps
 step "Extra apps (pinta/eza/atril/OnlyOffice)" do_extra_apps
-step "XFCE theme (Numix + dark bg)" do_xfce_theme
-step "XFCE panel"                 do_xfce_panel
-step "Login policy"               do_login_policy
-step "IP screensaver (phosphor)"  do_ip_screensaver
+only_on xfce  "XFCE theme (Numix + dark bg)" do_xfce_theme
+only_on xfce  "XFCE panel"                 do_xfce_panel
+only_on xfce  "Login policy"               do_login_policy
+only_on gnome "GDM autologin"              do_gdm_autologin
+only_on xfce  "IP screensaver (phosphor)"  do_ip_screensaver
 step "iMac function keys"         do_imac_fnkeys
-step "Terminal F-keys (byobu)"    do_terminal_accels
-step "Thai keyboard layout"       do_keyboard_thai
-step "Panel language indicator"   do_panel_language_indicator
-step "ulauncher (Ctrl+Space)"     do_ulauncher
+only_on xfce  "Terminal F-keys (byobu)"    do_terminal_accels
+only_on xfce  "Thai keyboard layout"       do_keyboard_thai
+only_on gnome "Thai keyboard layout (GNOME)" do_keyboard_thai_gnome
+only_on xfce  "Panel language indicator"   do_panel_language_indicator
+only_on xfce  "ulauncher (Ctrl+Space)"     do_ulauncher
 step "Haskell deps"               do_haskell_deps
 step "GHC ${GHC_VER}"             do_ghc
 step "GHCup"                      do_ghcup
@@ -1429,6 +1518,7 @@ step "SWI-Prolog"                 do_prolog
 step "Racket"                     do_racket
 step "Restrict SSH to sudoer"     do_ssh_restrict
 
+[[ -n "${LAB_DRY_RUN:-}" ]] && exit 0
 verify_install
 exit $?
 
