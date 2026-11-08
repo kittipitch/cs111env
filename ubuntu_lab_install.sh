@@ -46,6 +46,16 @@
 #                    There is no default and no autodetection on purpose: the xfce
 #                    path deletes any account named `student`, which on a lab box is
 #                    the real account, and XFCE boxes can also have gnome-shell.
+#
+# DESKTOP, SUDOER_ACCOUNT, STUDENT_ACCOUNT and STUDENT_PASSWORD can also live in a
+# private .env next to this script. A value set in the environment wins.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Parsed, not sourced: a password containing < or $ would break the shell.
+env_file_value() { grep -m1 "^$1=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2-; }
+DESKTOP="${DESKTOP:-$(env_file_value DESKTOP)}"
+SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-$(env_file_value SUDOER_ACCOUNT)}"
+STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-$(env_file_value STUDENT_ACCOUNT)}"
+STUDENT_PASSWORD="${STUDENT_PASSWORD:-$(env_file_value STUDENT_PASSWORD)}"
 case "${DESKTOP:-}" in
   xfce)  DEFAULT_STUDENT_ACCOUNT="csmajor" ;;
   gnome) DEFAULT_STUDENT_ACCOUNT="student" ;;
@@ -84,7 +94,6 @@ GHC_ENV="/usr/local/lib/ghc-${GHC_VER}/lib/ghc.env"
 GHC_PKGDB="/usr/local/lib/ghc-${GHC_VER}/lib/package.conf.d"
 CABAL_PKGDB="/usr/local/lib/ghc-${GHC_VER}/cabal-store/ghc-${GHC_VER}/package.db"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PASSWORD_FILE="$SCRIPT_DIR/student_password.txt"
 
 # Whether the installer (admin) account was provisioned with dot files this run
