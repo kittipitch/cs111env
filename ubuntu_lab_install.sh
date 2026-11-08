@@ -276,6 +276,12 @@ do_student_policy() {
 # ============================================================
 # System + basic tools
 # ============================================================
+do_no_mail() {
+  dpkg -s postfix &>/dev/null || return 0
+  echo "    Removing postfix (these machines send no mail)..."
+  sudo apt purge -y postfix
+}
+
 do_system_update() {
   # apt update may exit non-zero because of unrelated broken third-party repos
   # already on the machine; that must not stop us. upgrade is best-effort.
@@ -290,9 +296,11 @@ do_basic_tools() {
     tar zip unzip git build-essential bash-completion xz-utils \
     python3-pip python3-venv pipenv pipx mypy \
     tmux byobu dos2unix xclip wl-clipboard fzf \
-    emacs-nox vim neovim bat \
+    vim neovim bat \
     wget curl gnupg ca-certificates \
     kdiff3
+  # emacs-nox recommends a mail server, and postfix then listens on port 25.
+  sudo apt install -y --no-install-recommends emacs-nox
 
   # Clipboard helper for the byobu copy bindings (~/.byobu/.tmux.conf). Picks
   # the backend at runtime: Wayland -> wl-copy, X11 -> xsel/xclip. xclip + the
@@ -608,11 +616,6 @@ do_xfce_apps() {
     rm -f "$key"
   }
 
-  # WezTerm terminal
-  command -v wezterm &>/dev/null && \
-    echo "      WezTerm already installed." || {
-    sudo apt install -y wezterm
-  }
   return 0
 }
 
@@ -750,19 +753,6 @@ Icon=sublime-text
 Categories=TextEditor;Development;
 EOF
 
-    # WezTerm launcher
-    sudo tee "$launcher_dir/wezterm.desktop" > /dev/null << 'EOF'
-[Desktop Entry]
-Version=1.0
-Name=WezTerm
-GenericName=Terminal
-Comment=GPU-accelerated terminal emulator
-Exec=wezterm
-Terminal=false
-Type=Application
-Categories=System;TerminalEmulator;
-EOF
-
     sudo chown -R "$user:$user" "$launcher_dir"
 
     # Create panel configuration with launchers
@@ -815,10 +805,10 @@ EOF
     sudo mkdir -p "$user_home/.config/xfce4/panel/plugin-4"
     sudo tee "$user_home/.config/xfce4/panel/plugin-4/launcher-4.rc" > /dev/null << 'EOF'
 [Entry]
-Name=WezTerm
+Name=Terminal
 Comment=Terminal
 Icon=terminal
-Exec=wezterm
+Exec=xfce4-terminal
 EOF
 
     sudo chown -R "$user:$user" "$user_home/.config/xfce4"
@@ -1126,6 +1116,22 @@ D
       || sudo -u "$user" xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary>space" -s "ulauncher-toggle" 2>/dev/null || true
   done
   return 0
+}
+
+# GNOME lab and exam machines: nothing comes in except SSH. ssh is allowed before ufw
+# turns on, so a run over SSH keeps its connection. Docker publishes ports through its own
+# rules, around ufw, so containers can still expose ports during class.
+do_firewall() {
+  sudo ufw default deny incoming
+  sudo ufw allow ssh
+  sudo ufw --force enable
+}
+
+# Passes when only sshd listens beyond loopback. Run it before class starts containers.
+verify_only_ssh_listens() {
+  local open
+  open="$(ss -Hltn | awk '{print $4}' | grep -vE '^(127\.|\[::1\])' | grep -vE ':22$')"
+  [[ -z "$open" ]] || { echo "$open"; return 1; }
 }
 
 # Restrict SSH logins to the maintenance sudoer only (students never SSH in).
@@ -1473,6 +1479,7 @@ verify_install() {
   vcrit "python3"                     python3 --version
   vcrit "mypy"                        mypy --version
   vcrit "Sublime (subl)"             command -v subl
+  vcrit "no mail server"             bash -c "! dpkg -s postfix"
 
   echo ""
   echo " VERIFICATION (OPTIONAL)"
@@ -1482,6 +1489,8 @@ verify_install() {
     vcrit "lazydocker"                lazydocker --version
     vcrit "one Docker daemon (docker-ce only)" verify_one_docker_daemon
     vcrit "${STUDENT_ACCOUNT} in docker group" bash -c "id -nG '${STUDENT_ACCOUNT}' | grep -qw docker"
+    vcrit "firewall on"               bash -c "sudo ufw status | grep -q '^Status: active'"
+    vcrit "only SSH listens beyond loopback" verify_only_ssh_listens
   elif is_lab_cscmu_machine; then
     echo "  [skip] Skipping Docker verification on cscmu lab machine"
     echo "  [skip] Skipping lazydocker verification on cscmu lab machine"
@@ -1552,13 +1561,14 @@ step "Student account"            setup_student_account
 step "Restricted student policy"  do_student_policy
 step "System update"              do_system_update
 step "Basic tools"                do_basic_tools
+step "No mail server"             do_no_mail
 step "Programming fonts"          do_fonts
 step "uv (Python pkg mgr)"        do_uv
 step "Dot files (ubuntu_home)"    install_all_dotfiles
 step "ntfy callback mechanism"    do_ntfy_report
 step "Python (numpy/pandas)"      do_python
 step "Sublime Text"               do_sublime
-step "Desktop apps (Brave/WezTerm)" do_xfce_apps
+step "Desktop apps (Brave)"       do_xfce_apps
 step "Extra apps (pinta/eza/atril/OnlyOffice)" do_extra_apps
 only_on xfce  "XFCE theme (Numix + dark bg)" do_xfce_theme
 only_on xfce  "XFCE panel"                 do_xfce_panel
@@ -1592,6 +1602,7 @@ step "Ruby"                       do_ruby
 step "SWI-Prolog"                 do_prolog
 step "Racket"                     do_racket
 step "Restrict SSH to sudoer"     do_ssh_restrict
+only_on gnome "Firewall (SSH only)"        do_firewall
 
 [[ -n "${LAB_DRY_RUN:-}" ]] && exit 0
 verify_install
