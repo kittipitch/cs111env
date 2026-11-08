@@ -592,11 +592,20 @@ do_xfce_apps() {
   # Brave browser
   command -v brave-browser &>/dev/null && \
     echo "      Brave browser already installed." || {
-    sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave.com/brave-browser-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | \
-      sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
-    sudo apt update
-    sudo apt install -y brave-browser
+    # Write the repo line only with a key in place: an unsigned repo fails every later
+    # `apt update`, which silently cost a later step its packages (Node fell back to 18).
+    local key; key="$(mktemp)"
+    if fetch https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg "$key"; then
+      sudo install -m644 "$key" /usr/share/keyrings/brave-browser-archive-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | \
+        sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+      sudo apt update
+      sudo apt install -y brave-browser
+    else
+      echo "    WARNING: Brave key download failed; skipping Brave."
+      sudo rm -f /etc/apt/sources.list.d/brave-browser-release.list
+    fi
+    rm -f "$key"
   }
 
   # WezTerm terminal
@@ -1158,7 +1167,10 @@ do_ghc() {
   # fall through and reinstall the pinned one.
   ghc --version 2>/dev/null | grep -qF "$GHC_VER" && { echo "    ghc ${GHC_VER} present."; return 0; }
   mkdir -p ~/Downloads; cd ~/Downloads || return 1
-  sudo rm -rf ~/.ghc* ~/.cabal /usr/local/lib/ghc* 2>/dev/null
+  # Not `~/.ghc*`: that also matches ~/.ghcup, and the pinned dir holds the default env
+  # link that the dot files step made earlier in this run.
+  sudo find ~/.ghc -mindepth 1 -maxdepth 1 ! -name "x86_64-linux-${GHC_VER}" -exec rm -rf {} + 2>/dev/null
+  sudo rm -rf ~/.cabal /usr/local/lib/ghc* 2>/dev/null
   sudo rm -f /usr/local/bin/ghc* 2>/dev/null
   local tb="ghc-${GHC_VER}-x86_64-ubuntu22_04-linux.tar.xz"
   fetch "https://downloads.haskell.org/~ghc/${GHC_VER}/${tb}" "$tb" || {
@@ -1232,8 +1244,10 @@ do_java() { sudo apt install -y openjdk-21-jdk; }
 
 do_node() {
   command -v node &>/dev/null && node -v | grep -q '^v24\.' && { echo "    node already current."; return 0; }
-  curl -fsSL --retry 3 https://deb.nodesource.com/setup_24.x | sudo -E bash - \
-    && sudo apt install -y nodejs
+  curl -fsSL --retry 3 https://deb.nodesource.com/setup_24.x | sudo -E bash -
+  sudo apt install -y nodejs
+  # The pipe hides a failed setup, and apt then installs Ubuntu's older Node.
+  node -v 2>/dev/null | grep -q '^v24\.' || { echo "    [FAIL] node is $(node -v 2>/dev/null), wanted v24."; return 1; }
 }
 
 do_bun() {
@@ -1408,7 +1422,9 @@ verify_account() {  # verify_account <user>
   local privileged='^(sudo|admin|wheel|docker|lxd)$'
   # GNOME lab: student has docker on purpose for class (do_student_docker_access).
   [[ "$DESKTOP" == "gnome" && "$acct" == "$STUDENT_ACCOUNT" ]] && privileged='^(sudo|admin|wheel|lxd)$'
-  if id -nG "$acct" | tr ' ' '\n' | grep -Eq "$privileged"; then
+  if [[ "$acct" == "$SUDOER_ACCOUNT" ]]; then
+    :  # the sudoer is meant to have sudo
+  elif id -nG "$acct" | tr ' ' '\n' | grep -Eq "$privileged"; then
     echo "    [FAIL] $acct has privileged supplementary group(s): $(id -nG "$acct")"
     VFAIL=$((VFAIL+1))
   else echo "    [ OK ] no privileged supplementary groups"; fi
