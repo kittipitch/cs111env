@@ -405,8 +405,8 @@ It installs GHC, which is the Haskell compiler.
    ghcup set cabal 3.14.2.0
    ghcup install stack 3.7.1
    ghcup set stack 3.7.1
-   ghcup install hls 2.13.0.0
-   ghcup set hls 2.13.0.0
+   ghcup install hls 2.14.0.0
+   ghcup set hls 2.14.0.0
    cabal update
    cabal install --lib HUnit-1.6.2.0 --force-reinstalls
    ```

@@ -165,6 +165,7 @@ if ! command -v ghcup &> /dev/null; then
   export BOOTSTRAP_HASKELL_NO_UPGRADE=1
   export BOOTSTRAP_HASKELL_GHC_VERSION=9.6.7
   export BOOTSTRAP_HASKELL_CABAL_VERSION=3.14.2.0
+  export BOOTSTRAP_HASKELL_HLS_VERSION=2.14.0.0
   export BOOTSTRAP_HASKELL_INSTALL_STACK=1
   export BOOTSTRAP_HASKELL_INSTALL_HLS=1
   export BOOTSTRAP_HASKELL_ADJUST_BASHRC=1
@@ -184,12 +185,16 @@ echo "==> Verifying Haskell tools..."
 ghcup --version
 ghc --version
 cabal --version
+# HLS drift is invisible without this: 2.13.0.0 has no noble bindist and a
+# silent fallback used to ship 2.14.x with no wrapper symlink at all.
+haskell-language-server-wrapper --version || echo "WARNING: HLS wrapper missing"
+ormolu --version || echo "WARNING: ormolu missing"
 
 echo "==> Installing stack, HUnit, and HLS..."
 ghcup install stack 3.7.1 2>/dev/null || true
 ghcup set stack 3.7.1 2>/dev/null || true
-ghcup install hls 2.13.0.0 2>/dev/null || true
-ghcup set hls 2.13.0.0 2>/dev/null || true
+ghcup install hls 2.14.0.0 2>/dev/null || true
+ghcup set hls 2.14.0.0 2>/dev/null || true
 
 if command -v cabal &> /dev/null; then
   cabal update 2>/dev/null || true
