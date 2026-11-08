@@ -1278,6 +1278,15 @@ remove_other_dockers() {
   hash -r
 }
 
+# GNOME lab: let the no-sudo student use Docker and lazydocker in class (course 204212).
+# The docker group is root-equivalent, so reset_student.sh removes it for exams. After
+# an exam, give it back with: sudo usermod -aG docker student
+# Runs after do_docker, which creates the group. Takes effect at the next login.
+do_student_docker_access() {
+  getent group docker >/dev/null || { echo "    [FAIL] group docker missing"; return 1; }
+  sudo usermod -aG docker "$STUDENT_ACCOUNT"
+}
+
 # Passes only with docker-ce as the single running daemon (rootless would add one).
 verify_one_docker_daemon() {
   local p
@@ -1396,7 +1405,10 @@ verify_account() {  # verify_account <user>
   else echo "    [FAIL] Sublime LSP.sublime-settings missing/!correct path"; VFAIL=$((VFAIL+1)); fi
   if sudo test -f "$home/Desktop/TestSetup.hs"; then echo "    [ OK ] Desktop/TestSetup.hs"
   else echo "    [FAIL] Desktop/TestSetup.hs missing"; VFAIL=$((VFAIL+1)); fi
-  if id -nG "$acct" | tr ' ' '\n' | grep -Eq '^(sudo|admin|wheel|docker|lxd)$'; then
+  local privileged='^(sudo|admin|wheel|docker|lxd)$'
+  # GNOME lab: student has docker on purpose for class (do_student_docker_access).
+  [[ "$DESKTOP" == "gnome" && "$acct" == "$STUDENT_ACCOUNT" ]] && privileged='^(sudo|admin|wheel|lxd)$'
+  if id -nG "$acct" | tr ' ' '\n' | grep -Eq "$privileged"; then
     echo "    [FAIL] $acct has privileged supplementary group(s): $(id -nG "$acct")"
     VFAIL=$((VFAIL+1))
   else echo "    [ OK ] no privileged supplementary groups"; fi
@@ -1453,6 +1465,7 @@ verify_install() {
     vcrit "docker"                    docker --version  # needed by course 204212
     vcrit "lazydocker"                lazydocker --version
     vcrit "one Docker daemon (docker-ce only)" verify_one_docker_daemon
+    vcrit "${STUDENT_ACCOUNT} in docker group" bash -c "id -nG '${STUDENT_ACCOUNT}' | grep -qw docker"
   elif is_lab_cscmu_machine; then
     echo "  [skip] Skipping Docker verification on cscmu lab machine"
     echo "  [skip] Skipping lazydocker verification on cscmu lab machine"
@@ -1556,6 +1569,7 @@ step "Bun ${BUN_VER}"              do_bun
 step "Go 1.19.13"                 do_go
 step "Docker"                     do_docker
 step "lazydocker"                 do_lazydocker
+only_on gnome "Student Docker access"      do_student_docker_access
 step "Veriton slow boot services" do_disable_veriton_slow_boot_services
 step "GitHub CLI"                 do_gh
 step "Ruby"                       do_ruby
