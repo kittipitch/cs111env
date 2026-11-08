@@ -163,6 +163,16 @@ do_dotfiles() {
 
 do_fonts() { cask font-fira-code && cask font-iosevka-nerd-font; }
 
+# Intel Macs keep brew in /usr/local, so an existing python.org install there blocks
+# `brew link`. Those links are the student's, so explain the fix instead of replacing them.
+do_python() {
+  formula python@3.12 && return 0
+  echo "    [FAIL] brew could not finish python@3.12, usually because Python from python.org"
+  echo "           is already in /usr/local/bin. To replace those links with Homebrew's:"
+  echo "             brew link --overwrite python@3.12"
+  return 1
+}
+
 do_haskell() {
   if [[ ! -x "$HOME/.ghcup/bin/ghcup" ]]; then
     export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
@@ -324,7 +334,7 @@ step "Basic tools"       formulas git bash-completion tmux byobu coreutils pipx 
 step "kdiff3"            cask kdiff3 kdiff3.app
 step "Dot files"         do_dotfiles
 step "Fonts"             do_fonts
-step "Python 3.12"       formula python@3.12
+step "Python 3.12"       do_python
 step "uv"                formula uv
 step "Java 21"           formula openjdk@21
 step "C/C++ (GNU gcc)"   formula gcc
