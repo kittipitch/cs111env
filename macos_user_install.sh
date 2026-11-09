@@ -22,6 +22,7 @@ CABAL_VER="3.16.1.0"
 STACK_VER="3.7.1"
 HLS_VER="2.14.0.0"
 HUNIT_VER="1.6.2.0"
+QUICKCHECK_VER="2.14.3"
 ORMOLU_VER="0.7.2.0"
 ORMOLU_RESOLVER="lts-22.44"
 BUN_VER="1.3.14"
@@ -189,6 +190,11 @@ do_haskell() {
   ghcup install hls "$HLS_VER" && ghcup set hls "$HLS_VER" || return 1
   cabal update || return 1
   cabal install --lib "HUnit-${HUNIT_VER}" --force-reinstalls
+  # QuickCheck: same version set as the grader (204115 property tests)
+  cabal install --lib "QuickCheck-${QUICKCHECK_VER}" \
+    --constraint='containers installed' --constraint='bytestring installed' \
+    --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+    --force-reinstalls
 }
 
 do_ormolu() {
@@ -289,6 +295,7 @@ verify_install() {
   vver  "HLS"      "$HLS_VER"          'haskell-language-server-wrapper --version'
   vver  "ormolu"   "$ORMOLU_VER"       'ormolu --version'
   vcrit "HUnit importable"     'ghc -e "import Test.HUnit"'
+  vcrit "QuickCheck importable" 'ghc -e "import Test.QuickCheck"'
   # A real compile and link: this is what fails when a GNU gcc shadows Apple's clang.
   t="$(mktemp -d)"; printf 'main :: IO ()\nmain = putStrLn "ok"\n' > "$t/Hello.hs"
   vver  "ghc compiles and links" "ok"  "ghc -outputdir '$t' -o '$t/hello' '$t/Hello.hs' && '$t/hello'"

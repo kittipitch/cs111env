@@ -428,6 +428,10 @@ It installs GHC, which is the Haskell compiler.
    ghcup set hls 2.14.0.0
    cabal update
    cabal install --lib HUnit-1.6.2.0 --force-reinstalls
+   cabal install --lib QuickCheck-2.14.3 \
+     --constraint='containers installed' --constraint='bytestring installed' \
+     --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+     --force-reinstalls
    ```
 
 ### 16. Configure Sublime Text for Haskell

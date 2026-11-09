@@ -89,6 +89,7 @@ CABAL_VER="3.16.1.0"
 STACK_VER="3.7.1"
 HLS_VER="2.14.0.0"
 HUNIT_VER="1.6.2.0"
+QUICKCHECK_VER="2.14.3"
 ORMOLU_VER="0.7.2.0"
 BUN_VER="1.3.14"
 GHC_ENV="/usr/local/lib/ghc-${GHC_VER}/lib/ghc.env"
@@ -1225,6 +1226,13 @@ do_hunit() {
     --lib "HUnit-${HUNIT_VER}" call-stack \
     --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
     --global --overwrite-policy=always --force-reinstalls
+  # QuickCheck: same version set as the grader (204115 property tests)
+  sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
+    --lib "QuickCheck-${QUICKCHECK_VER}" \
+    --constraint='containers installed' --constraint='bytestring installed' \
+    --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+    --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
+    --global --overwrite-policy=always
 }
 
 do_ormolu() {
@@ -1474,6 +1482,7 @@ verify_install() {
   vver  "HUnit"    "HUnit-$HUNIT_VER"  sudo ghc-pkg --package-db="$CABAL_PKGDB" list HUnit
   vcrit "HLS typecheck a .hs file"    verify_hls_typecheck
   vcrit "HUnit importable"            sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.HUnit"
+  vcrit "QuickCheck importable"        sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.QuickCheck"
   vcrit "java"                        java -version
   vver  "node"     "v24."              node -v
   vcrit "npm"                         npm -v
@@ -1589,7 +1598,7 @@ step "GHC ${GHC_VER}"             do_ghc
 step "GHCup"                      do_ghcup
 step "Cabal ${CABAL_VER}"         do_cabal
 step "Stack ${STACK_VER}"         do_stack
-step "HUnit ${HUNIT_VER} (global)" do_hunit
+step "HUnit+QuickCheck (global)" do_hunit
 step "Ormolu"                     do_ormolu
 step "Haskell Language Server"    do_hls
 step "Java (OpenJDK 21)"          do_java

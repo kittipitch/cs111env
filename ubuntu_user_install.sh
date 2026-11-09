@@ -201,6 +201,11 @@ ghcup set hls 2.14.0.0 2>/dev/null || true
 if command -v cabal &> /dev/null; then
   cabal update 2>/dev/null || true
   cabal install --lib HUnit-1.6.2.0 --force-reinstalls 2>/dev/null || true
+  # QuickCheck: same version set as the grader (204115 property tests)
+  cabal install --lib QuickCheck-2.14.3 \
+    --constraint='containers installed' --constraint='bytestring installed' \
+    --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+    --force-reinstalls 2>/dev/null || true
 fi
 
 echo "==> Installing Ormolu (Haskell formatter)..."
