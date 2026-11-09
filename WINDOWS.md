@@ -4,7 +4,7 @@ This guide sets up Windows, Sublime Text, and WSL with Ubuntu 24.04.
 
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
-> **For CS111 (Python) and CS115 (Haskell).** For CS200+ courses (Java, C/C++, Go, NodeJS, Docker), use [Windows (native, no WSL)](WINDOWS_NATIVE.md), [macOS](MACOS.md), or [Ubuntu](UBUNTU.md).
+> **For CS111 (Python) and CS115 (Haskell).** For CS200+ courses (Java, C/C++, Go, NodeJS, Docker), use [macOS](MACOS.md) or [Ubuntu](UBUNTU.md).
 
 ## Table of Contents
 

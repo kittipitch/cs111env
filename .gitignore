@@ -5,3 +5,7 @@ ntfy_admin.secret
 .env
 .env.*
 !.env.example
+
+*.bak_
+*.bak_*
+.claude/autoharness/
