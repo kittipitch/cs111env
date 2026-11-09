@@ -1,7 +1,11 @@
 # Windows (Native, no WSL) Setup Guide
 
-This guide sets up a full programming environment directly on Windows 10/11 — **no WSL**.
-It covers every course: Python, Haskell, Java, C/C++, NodeJS + Bun, Go, and Docker.
+> **Who this guide is for:** the Python-only courses **204101 and 204217**. Other courses
+> should use [Ubuntu](UBUNTU.md) or [macOS](MACOS.md) instead. Only the Python steps are
+> needed for those two courses; the rest of this guide covers the other tools it installs.
+
+This guide sets up a programming environment directly on Windows 10/11 — **no WSL**.
+It covers Python, Haskell, Java, C/C++, NodeJS + Bun, Go, and Docker.
 
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
