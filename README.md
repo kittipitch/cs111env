@@ -14,12 +14,13 @@
 
 | Level | Content | Platform |
 |-------|---------|----------|
-| **100-level** (CS111/CS115) | Python, Haskell | Windows + WSL, macOS, Ubuntu, or **[GitHub Codespaces](#browser-based-options)** |
-| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Bun, Docker | macOS, Ubuntu, or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
+| **100-level** (CS111/CS115) | Python, Haskell | **Ubuntu** (native or dual-boot) or **macOS**; [Windows + WSL](#windows--wsl) only if you cannot dual-boot; or **[GitHub Codespaces](#browser-based-options)** |
+| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Bun, Docker | **Ubuntu** (native or dual-boot) or **macOS**; or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
 
 ## Platform Guides
 
-Choose your platform below:
+Choose your platform below. **Ubuntu (native or dual-boot) and macOS are the supported
+setups; Windows + WSL is a fallback for machines that cannot dual-boot.**
 
 ### [Windows + WSL](WINDOWS.md)
 
