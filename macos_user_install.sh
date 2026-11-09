@@ -196,6 +196,25 @@ do_ormolu() {
   stack install "ormolu-${ORMOLU_VER}" --resolver "$ORMOLU_RESOLVER"
 }
 
+# macOS ships no GNU gcc — /usr/bin/gcc is Apple's clang, which GHC expects. If an
+# unversioned GNU gcc (not brew's versioned gcc-16) sits earlier on PATH, ghc fails to
+# link with "unrecognized command-line option '--target'". Fix: point GHC's own settings
+# back at clang. Idempotent; safe with no GHC on the machine.
+do_gcc_fix() {
+  local gccid settings
+  gccid="$(gcc --version 2>/dev/null | head -1)"
+  [[ -z "$gccid" ]] && { echo "    no gcc on PATH yet; nothing to check."; return 0; }
+  [[ "$gccid" == *"Apple clang"* ]] && { echo "    plain gcc is Apple clang; nothing to fix."; return 0; }
+  echo "    PATH shadows clang with: $gccid — patching GHC settings."
+  . "$HOME/.ghcup/env" 2>/dev/null
+  settings="$(ghc --print-libdir 2>/dev/null)/lib/settings"
+  [[ -f "$settings" ]] || { echo "    [FAIL] GHC settings file not found: $settings"; return 1; }
+  sed 's/, "gcc")/, "clang")/g; s/, "g++")/, "clang++")/g' "$settings" > "$settings.tmp" || return 1
+  cp -a "$settings" "$settings.bak_$(date +%s)"
+  cat "$settings.tmp" > "$settings" && rm -f "$settings.tmp"
+  echo "    GHC now links with clang (backup saved beside the settings file)."
+}
+
 do_bun() {
   [[ "$(bun --version 2>/dev/null)" == "$BUN_VER" ]] && { echo "    bun ${BUN_VER} already installed."; return 0; }
   curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VER}"
@@ -304,7 +323,8 @@ verify_install() {
     echo " RESULT: SUCCESS (${VWARN} optional warning(s))"
   else
     echo " RESULT: FAILURE, ${VFAIL} critical check(s) failed (${VWARN} optional warning(s))"
-    echo " If 'ghc compiles and links' failed, see MACOS.md step 17."
+    echo " If 'ghc compiles and links' failed, re-run this script (its GHC gcc shadow fix"
+    echo " step patches GHC's settings), or see MACOS.md step 17."
   fi
   echo ""
   echo "Next steps:"
@@ -344,6 +364,7 @@ step "zshrc PATH block"  do_zshrc
 step "Sublime Text"      cask sublime-text "Sublime Text.app"
 step "Haskell (GHC ${GHC_VER}, cabal, stack, HLS ${HLS_VER}, HUnit)" do_haskell
 step "Ormolu"            do_ormolu
+step "GHC gcc shadow fix" do_gcc_fix
 step "Bun ${BUN_VER}"    do_bun
 step "VS Code"           cask visual-studio-code "Visual Studio Code.app"
 step "OrbStack (Docker)" do_orbstack

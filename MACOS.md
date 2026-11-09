@@ -34,7 +34,7 @@ curl -fsSLO https://raw.githubusercontent.com/kittipitch/cs111env/main/macos_use
 bash macos_user_install.sh
 ```
 
-It is safe to run again. It does not upgrade what you already have, and it does not overwrite your dot files. To follow the steps by hand instead, continue below.
+It is safe to run again. It does not upgrade what you already have, and it does not overwrite your dot files. If Haskell later fails to compile with a `gcc: error: unrecognized command-line option '--target'` message, run the script again — its **GHC gcc shadow fix** step repairs GHC's settings automatically. To follow the steps by hand instead, continue below.
 
 ## System Setup
 
@@ -524,7 +524,9 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    > `gcc: error: unrecognized command-line option '--target=...'`
    > then something earlier on your `PATH` (usually a GNU gcc installed under
    > `~/.local` or another prefix) is shadowing Apple's clang. Check with
-   > `which gcc`. Fix by pointing GHC's own settings back at clang (one time):
+   > `which gcc`. The one-script install at the top of this page fixes this for
+   > you (re-run `bash macos_user_install.sh`). To fix it by hand, point GHC's
+   > own settings back at clang (one time):
 
    ```bash
    SETTINGS="$(ghc --print-libdir)/lib/settings"
