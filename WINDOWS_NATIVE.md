@@ -1,11 +1,11 @@
 # Windows (Native, no WSL) Setup Guide
 
-> **Who this guide is for:** the Python-only courses **204101 and 204217**. Other courses
-> should use [Ubuntu](UBUNTU.md) or [macOS](MACOS.md) instead. Only the Python steps are
-> needed for those two courses; the rest of this guide covers the other tools it installs.
+> **Who this guide is for:** the Python-only courses **204101 and 204217**.
+> **CS111, CS115, CS255 and CS212 must not use this guide** — use
+> [Ubuntu](UBUNTU.md) or [macOS](MACOS.md) instead.
 
-This guide sets up a programming environment directly on Windows 10/11 — **no WSL**.
-It covers Python, Haskell, Java, C/C++, NodeJS + Bun, Go, and Docker.
+This guide sets up a Python environment (Python 3.12, mypy, Sublime Text or VS Code)
+directly on Windows 10/11 — **no WSL**.
 
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
@@ -20,12 +20,7 @@ All commands below are typed in **PowerShell** (not as Administrator unless the 
 - [Basic Tools](#basic-tools)
 - [Python](#python)
 - [Sublime Text](#sublime-text)
-- [Haskell](#haskell)
-- [Java](#java)
-- [C/C++](#cc)
-- [NodeJS, Bun & Go](#nodejs-bun--go)
-- [Docker](#docker)
-- [Additional Tools](#additional-tools) (AI CLIs: agy, claude, codex)
+- [VS Code (alternative editor)](#vs-code-alternative-editor)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -39,8 +34,8 @@ Change to **Win + Space bar** (or anything else). **DO NOT use 'Grave Accent'** 
 
 ### 2. Allow PowerShell scripts
 
-Windows blocks PowerShell scripts by default. `npm`, `npx`, and the Haskell installer are
-PowerShell scripts, so they fail with *"running scripts is disabled on this system"* until you run:
+Windows blocks PowerShell scripts by default. Some installers and tools used in this guide
+are PowerShell scripts, so they fail with *"running scripts is disabled on this system"* until you run:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
@@ -388,367 +383,30 @@ Go to **Preferences → Key Bindings** and add to the right panel:
 Restart Sublime Text. **Alt + `** now opens PowerShell inside Sublime Text.
 
 ---
+## VS Code (alternative editor)
 
-## Haskell
+### 14. Install VS Code
 
-### 14. Haskell Setup via GHCup
-
-GHCup installs and manages Haskell tools. On Windows it also installs MSYS2 (needed to build packages).
-
-1. Open PowerShell (**not** as Administrator) and run:
-
-   ```powershell
-   Set-ExecutionPolicy Bypass -Scope Process -Force;[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; try { & ([ScriptBlock]::Create((Invoke-WebRequest https://www.haskell.org/ghcup/sh/bootstrap-haskell.ps1 -UseBasicParsing))) -Interactive -DisableCurl } catch { Write-Error $_ }
-   ```
-
-2. Accept the default install location (`C:\ghcup`). Answer **No** to installing HLS and stack
-   now — we install the exact course versions in the next step.
-
-3. When it finishes, **close all PowerShell windows** and open a new one. Check:
-
-   ```powershell
-   ghcup --version
-   ghc --version
-   ```
-
-4. Install the course versions (same as the autojudge):
-
-   ```powershell
-   ghcup install ghc 9.6.7
-   ghcup set ghc 9.6.7
-   ghcup install cabal 3.14.2.0
-   ghcup set cabal 3.14.2.0
-   ghcup install stack 3.7.1
-   ghcup set stack 3.7.1
-   ghcup install hls 2.14.0.0
-   ghcup set hls 2.14.0.0
-   cabal update
-   cabal install --lib HUnit-1.6.2.0 --force-reinstalls
-   ```
-
-### 15. Configure Sublime Text for Haskell
-
-This setup is **mandatory** for CS115.
-
-1. **Install Ormolu** (the Haskell code formatter):
-
-   ```powershell
-   cabal install ormolu-0.7.2.0 --overwrite-policy=always
-   ```
-
-   Open a new window and check:
-
-   ```powershell
-   haskell-language-server-wrapper --version
-   ormolu --version
-   ```
-
-2. Make Sublime Text use 2 spaces for Haskell: save a blank file as `test.hs`, go to
-   **Preferences → Settings - Syntax Specific**, and add:
-
-   ```json
-   {
-      "tab_size": 2,
-      "translate_tabs_to_spaces": true
-   }
-   ```
-
-3. Install **LSP**: **Ctrl + Shift + P** → "Package Control: Install Package" → "LSP".
-
-4. **Ctrl + Shift + P** → **Preferences: LSP Settings**, and add:
-
-   ```json
-   {
-     "lsp_format_on_save": true,
-
-     "clients": {
-       "haskell-language-server": {
-         "enabled": true,
-         "command": ["haskell-language-server-wrapper", "--lsp"],
-         "selector": "source.haskell",
-         "settings": {
-           "haskell.formattingProvider": "ormolu"
-         }
-       }
-     }
-   }
-   ```
-
-5. Restart Sublime Text.
-
-### 16. Create and Run a Haskell File (Hello World)
-
-`Hello.hs`:
-
-```haskell
-main :: IO ()
-main = putStrLn "Hello Haskell!!"
-```
-
-```powershell
-runghc Hello.hs
-```
-
-### 17. Verify Ormolu and LSP
-
-1. Create `TestSetup.hs`:
-
-   ```haskell
-   -- 1. Test LSP formatting (Ormolu):
-   --    Try to mess up indentation or remove spaces around '=',
-   --    then save the file. It should auto-format on save.
-   x = 1 + 2
-
-   -- Intentional type error to test LSP - uncomment
-   -- badValue :: Int
-   -- badValue = "this is not an int"
-
-   main :: IO ()
-   main = putStrLn "LSP is working!"
-   ```
-
-2. **Save the file** and check that it auto-formats.
-3. Remove the `--` before the `badValue` lines and save. You should see a red error. Hover to read it.
-
-   <img src="images/nix/img61_nix_haskell_lsp_verify.png" alt="Haskell LSP Verify" width="600">
-
-4. Add the `--` back and save. The error should disappear.
-
----
-
-## Java
-
-### 18. Java Setup
-
-```powershell
-winget install -e --id Microsoft.OpenJDK.21
-```
-
-Open a new window and check:
-
-```powershell
-java -version   # Should show 21.x
-```
-
-`Hello.java`:
-
-```java
-public class Hello {
-    public static void main(String[] args) {
-        System.out.println("Hello world!!");
-    }
-}
-```
-
-```powershell
-javac Hello.java
-java Hello
-```
-
----
-
-## C/C++
-
-### 19. C/C++ Setup (GCC via WinLibs)
-
-WinLibs is GCC (`gcc`, `g++`, `gdb`) built for Windows.
-
-```powershell
-winget install -e --id BrechtSanders.WinLibs.POSIX.UCRT
-```
-
-Open a new window and check:
-
-```powershell
-g++ --version
-```
-
-`hello.cpp`:
-
-```cpp
-#include <iostream>
-using namespace std;
-
-int main() {
-    cout << "Hello world!!" << endl;
-    return 0;
-}
-```
-
-```powershell
-g++ -o hello.exe hello.cpp
-.\hello.exe
-```
-
----
-
-## NodeJS, Bun & Go
-
-### 20. NodeJS 24 Setup
-
-Install **Node.js 24** (comes with `npm` and `npx`), then **pin** it so `winget upgrade` does not
-jump to a newer major version:
-
-```powershell
-winget install -e --id OpenJS.NodeJS.LTS --version 24.19.0
-winget pin add --id OpenJS.NodeJS.LTS --version 24.*
-```
-
-Open a new window and check all three:
-
-```powershell
-node -v   # Should start with v24.
-npm -v
-npx -v
-```
-
-> `npm -v` fails with "running scripts is disabled"? You skipped [Step 2](#2-allow-powershell-scripts).
-
-### 21. Bun Setup
-
-Bun 1.3.11 (same version as the Ubuntu and macOS guides), pinned:
-
-```powershell
-winget install -e --id Oven-sh.Bun --version 1.3.11
-winget pin add --id Oven-sh.Bun --version 1.3.11
-```
-
-Open a new window and check:
-
-```powershell
-bun --version   # Should show 1.3.11
-```
-
-### 22. Go Setup
-
-```powershell
-winget install -e --id GoLang.Go --version 1.19.13
-winget pin add --id GoLang.Go --version 1.19.13
-```
-
-Open a new window and check:
-
-```powershell
-go version   # Should show go1.19.13
-```
-
-`hello.go`:
-
-```go
-package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Hello world!")
-}
-```
-
-```powershell
-go run hello.go
-```
-
----
-
-## Docker
-
-### 23. Install Docker Desktop
-
-> [!WARNING]
-> Docker on Windows needs a Linux VM. Without WSL, that VM is **Hyper-V**, which exists only on
-> **Windows Pro, Education, or Enterprise**. On **Windows Home**, Docker Desktop requires WSL 2 —
-> use the [Windows + WSL guide](WINDOWS.md) or a [GitHub Codespace](README.md#browser-based-options) instead.
-> Check your edition: Settings → System → About → *Edition*.
-
-1. Turn on Hyper-V — PowerShell **as Administrator**, then reboot:
-
-   ```powershell
-   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-   ```
-
-2. Install Docker Desktop with the Hyper-V backend:
-
-   ```powershell
-   winget install -e --id Docker.DockerDesktop --override "install --backend=hyper-v --quiet --accept-license"
-   ```
-
-3. Start Docker Desktop. In **Settings → General**, make sure "Use the WSL 2 based engine"
-   is **unchecked** (Apply & Restart if you changed it).
-
-4. Let your account use Docker — PowerShell **as Administrator**:
-
-   ```powershell
-   net localgroup docker-users $env:USERNAME /add
-   ```
-
-   **Sign out and sign back in**, then check (normal PowerShell):
-
-   ```powershell
-   docker run --rm hello-world
-   ```
-
-### 24. Install lazydocker
-
-lazydocker gives Docker a terminal screen.
-
-```powershell
-$v = (Invoke-RestMethod https://api.github.com/repos/jesseduffield/lazydocker/releases/latest).tag_name.TrimStart('v')
-Invoke-WebRequest "https://github.com/jesseduffield/lazydocker/releases/download/v$v/lazydocker_${v}_Windows_x86_64.zip" -OutFile "$env:TEMP\lazydocker.zip"
-Expand-Archive "$env:TEMP\lazydocker.zip" -DestinationPath "$env:LOCALAPPDATA\lazydocker" -Force
-[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ";$env:LOCALAPPDATA\lazydocker", 'User')
-```
-
-Open a new window and run `lazydocker`.
-
----
-
-## Additional Tools
-
-### 25. VSCode, fzf, GitHub CLI
+Prefer VS Code over Sublime Text? Install it with winget and add the Python extension
+(open VS Code → Extensions → search **Python** → install the Microsoft one):
 
 ```powershell
 winget install -e --id Microsoft.VisualStudioCode
-winget install -e --id junegunn.fzf
-winget install -e --id GitHub.cli
 ```
 
-### 26. AI command-line tools: Antigravity (`agy`), Claude Code (`claude`), Codex (`codex`)
+---
 
-```powershell
-winget install -e --id Google.AntigravityCLI
-winget install -e --id Anthropic.ClaudeCode
-winget install -e --id OpenAI.Codex
-```
-
-Open a new window and check:
-
-```powershell
-agy --version
-claude --version
-codex --version
-```
-
-- Each tool asks you to sign in the first time you run it (`agy`, `claude`, `codex`).
-- Claude Code uses **Git Bash** from Git for Windows ([Step 5](#5-install-git)) to run commands.
-- winget installs do not auto-update. Update with
-  `winget upgrade -e --id Google.AntigravityCLI` (or `Anthropic.ClaudeCode`, `OpenAI.Codex`).
-
-### 27. Verify everything
+### 15. Verify everything
 
 Open a new PowerShell window and run:
 
 ```powershell
 git --version; python --version; mypy --version; uv --version
-ghc --version; cabal --version; stack --version; ormolu --version
-java -version; g++ --version; node -v; npm -v; npx -v; bun --version; go version
-docker --version; gh --version; fzf --version
-ls --version; edit --version; agy --version; claude --version; codex --version
+ls --version; edit --version
 ```
 
 Every line should print a version. A "not recognized" error means that step's install did not
 finish, or the window was opened before the install — open a new one and try again.
-
----
 
 ## Troubleshooting
 
@@ -759,7 +417,7 @@ Settings → Apps → Advanced app settings → **App execution aliases** → tu
 
 ### A command is "not recognized" right after installing it
 
-Open a **new** PowerShell window. If Sublime Text cannot find a tool (mypy, HLS), restart
+Open a **new** PowerShell window. If Sublime Text cannot find a tool (mypy), restart
 Sublime Text — or sign out and back in.
 
 ### Exit Editors (Misc)
