@@ -1,0 +1,3 @@
+[submodule "ubuntu_home"]
+	path = ubuntu_home
+	url = https://github.com/kittipitch/ubuntu_home.git
