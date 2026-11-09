@@ -380,8 +380,8 @@ It installs GHC, which is the Haskell compiler.
    ```bash
    ghcup install ghc 9.6.7
    ghcup set ghc 9.6.7
-   ghcup install cabal 3.14.2.0
-   ghcup set cabal 3.14.2.0
+   ghcup install cabal 3.16.1.0
+   ghcup set cabal 3.16.1.0
    ghcup install stack 3.7.1
    ghcup set stack 3.7.1
    ghcup install hls 2.14.0.0
@@ -628,15 +628,15 @@ npm -v
 npx -v
 ```
 
-**Install Bun 1.3.11 (alongside NodeJS):**
+**Install Bun 1.3.14 (alongside NodeJS):**
 
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads
 cd ~/Downloads
-wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip --no-check-certificate
+wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip --no-check-certificate
 unzip bun-linux-x64.zip
 sudo cp bun-linux-x64/bun /usr/local/bin/
-bun --version  # Should show 1.3.11
+bun --version  # Should show 1.3.14
 ```
 
 ### 22. Go Setup

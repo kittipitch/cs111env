@@ -166,7 +166,7 @@ if ! command -v ghcup &> /dev/null; then
   export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
   export BOOTSTRAP_HASKELL_NO_UPGRADE=1
   export BOOTSTRAP_HASKELL_GHC_VERSION=9.6.7
-  export BOOTSTRAP_HASKELL_CABAL_VERSION=3.14.2.0
+  export BOOTSTRAP_HASKELL_CABAL_VERSION=3.16.1.0
   export BOOTSTRAP_HASKELL_HLS_VERSION=2.14.0.0
   export BOOTSTRAP_HASKELL_INSTALL_STACK=1
   export BOOTSTRAP_HASKELL_INSTALL_HLS=1
@@ -238,14 +238,14 @@ sudo apt install -y nodejs
 node -v && npm -v && npx -v
 
 # ============================================================
-# Bun 1.3.11 (alongside NodeJS)
+# Bun 1.3.14 (alongside NodeJS)
 # ============================================================
 
 if ! command -v bun &> /dev/null; then
-  echo "==> Installing Bun 1.3.11..."
+  echo "==> Installing Bun 1.3.14..."
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
-  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip --no-check-certificate
+  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip --no-check-certificate
   unzip -q bun-linux-x64.zip
   sudo cp bun-linux-x64/bun /usr/local/bin/
   cd ~

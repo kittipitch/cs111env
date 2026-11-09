@@ -681,8 +681,8 @@ It installs GHC, which is the Haskell compiler.
    ```bash
    ghcup install ghc 9.6.7
    ghcup set ghc 9.6.7
-   ghcup install cabal 3.14.2.0
-   ghcup set cabal 3.14.2.0
+   ghcup install cabal 3.16.1.0
+   ghcup set cabal 3.16.1.0
    ghcup install stack 3.7.1
    ghcup set stack 3.7.1
    ghcup install hls 2.14.0.0
@@ -860,9 +860,9 @@ node -v   # Should start with v24.
 npm -v
 npx -v
 
-curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.11"
+curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.14"
 source ~/.bashrc
-bun --version  # Should show 1.3.11
+bun --version  # Should show 1.3.14
 ```
 
 ---

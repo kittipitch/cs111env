@@ -18,13 +18,13 @@
 #   MAC_SKIP_DOCKER_ENGINE=1 skip starting the Docker engine and its checks (CI runners)
 
 GHC_VER="9.6.7"
-CABAL_VER="3.14.2.0"
+CABAL_VER="3.16.1.0"
 STACK_VER="3.7.1"
 HLS_VER="2.14.0.0"
 HUNIT_VER="1.6.2.0"
 ORMOLU_VER="0.7.2.0"
 ORMOLU_RESOLVER="lts-22.44"
-BUN_VER="1.3.11"
+BUN_VER="1.3.14"
 UBUNTU_HOME_REPO="https://github.com/kittipitch/ubuntu_home.git"
 MAC_APPS="${MAC_APPS:-/Applications}"
 export HOMEBREW_NO_INSTALL_UPGRADE=1  # brew install must not upgrade what is already there
