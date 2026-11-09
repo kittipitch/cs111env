@@ -23,7 +23,8 @@
 # system-wide tools, which always install to /usr/local for everyone.
 #
 #   SUDOER_ACCOUNT   The lab-admin account you are logged in as to run this
-#                    script (it has sudo). Its OWN dot files are overwritten
+#                    script (it has sudo; default: csblab on gnome, cscmu on
+#                    xfce). Its OWN dot files are overwritten
 #                    with the standard lab set — but ONLY if the user actually
 #                    running the script equals this name. If someone runs the
 #                    script from a different (e.g. personal) account, that
@@ -57,15 +58,15 @@ SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-$(env_file_value SUDOER_ACCOUNT)}"
 STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-$(env_file_value STUDENT_ACCOUNT)}"
 STUDENT_PASSWORD="${STUDENT_PASSWORD:-$(env_file_value STUDENT_PASSWORD)}"
 case "${DESKTOP:-}" in
-  xfce)  DEFAULT_STUDENT_ACCOUNT="csmajor" ;;
-  gnome) DEFAULT_STUDENT_ACCOUNT="student" ;;
+  xfce)  DEFAULT_STUDENT_ACCOUNT="csmajor" DEFAULT_SUDOER_ACCOUNT="cscmu" ;;
+  gnome) DEFAULT_STUDENT_ACCOUNT="student" DEFAULT_SUDOER_ACCOUNT="csblab" ;;
   *)
     echo "ERROR: set DESKTOP=xfce (csmajor room) or DESKTOP=gnome (lab, class and exam)." >&2
     echo "  e.g. DESKTOP=gnome SUDOER_ACCOUNT=<admin> bash ubuntu_lab_install.sh" >&2
     exit 2
     ;;
 esac
-SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-cscmu}"
+SUDOER_ACCOUNT="${SUDOER_ACCOUNT:-$DEFAULT_SUDOER_ACCOUNT}"
 STUDENT_ACCOUNT="${STUDENT_ACCOUNT:-$DEFAULT_STUDENT_ACCOUNT}"
 
 # Password used when this script has to CREATE the student account.
@@ -140,7 +141,7 @@ fetch() {  # fetch <url> <dest>
 is_lab_cscmu_machine() {
   # "cscmu" marks the slow CS major room machines that must not run Docker.
   # Other account policy must continue to use SUDOER_ACCOUNT/STUDENT_ACCOUNT.
-  # GNOME lab boxes also have cscmu as sudoer but need Docker (course 204212).
+  # GNOME lab boxes have csblab as sudoer but need Docker (course 204212).
   [[ "$DESKTOP" == "xfce" ]] && id cscmu &>/dev/null
 }
 
