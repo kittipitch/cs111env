@@ -1216,23 +1216,31 @@ do_stack() {
 }
 
 do_hunit() {
-  # Enforce the pinned HUnit version in the global package db.
-  if sudo ghc-pkg --package-db="$GHC_PKGDB" list HUnit 2>/dev/null | grep -qF "HUnit-${HUNIT_VER}"; then
-    echo "    HUnit ${HUNIT_VER} present."
-    return 0
-  fi
+  # Enforce the pinned HUnit and QuickCheck versions in the global package db.
+  # Each is checked on its own: a re-run on a box that already has HUnit must
+  # still install a missing QuickCheck.
+  local have
+  have="$(sudo ghc-pkg --package-db="$GHC_PKGDB" list HUnit QuickCheck 2>/dev/null)"
+  local need_hunit=1 need_qc=1
+  grep -qF "HUnit-${HUNIT_VER}" <<<"$have" && { echo "    HUnit ${HUNIT_VER} present."; need_hunit=0; }
+  grep -qF "QuickCheck-${QUICKCHECK_VER}" <<<"$have" && { echo "    QuickCheck ${QUICKCHECK_VER} present."; need_qc=0; }
+  (( need_hunit || need_qc )) || return 0
   cabal update
-  sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
-    --lib "HUnit-${HUNIT_VER}" call-stack \
-    --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
-    --global --overwrite-policy=always --force-reinstalls
-  # QuickCheck: same version set as the grader (204115 property tests)
-  sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
-    --lib "QuickCheck-${QUICKCHECK_VER}" \
-    --constraint='containers installed' --constraint='bytestring installed' \
-    --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
-    --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
-    --global --overwrite-policy=always
+  if (( need_hunit )); then
+    sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
+      --lib "HUnit-${HUNIT_VER}" call-stack \
+      --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
+      --global --overwrite-policy=always --force-reinstalls || return 1
+  fi
+  if (( need_qc )); then
+    # QuickCheck: same version set as the grader (204115 property tests)
+    sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
+      --lib "QuickCheck-${QUICKCHECK_VER}" \
+      --constraint='containers installed' --constraint='bytestring installed' \
+      --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+      --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
+      --global --overwrite-policy=always || return 1
+  fi
 }
 
 do_ormolu() {
