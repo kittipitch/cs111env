@@ -1220,14 +1220,16 @@ do_stack() {
 }
 
 do_hunit() {
-  # Enforce the pinned HUnit and QuickCheck versions in the global package db.
+  # Enforce the pinned HUnit and QuickCheck versions in the global environment.
+  # Check ghc.env (what GHC loads for students), not ghc-pkg: these packages live
+  # in the cabal store db, not $GHC_PKGDB, and ghc-pkg list takes one name only.
   # Each is checked on its own: a re-run on a box that already has HUnit must
   # still install a missing QuickCheck.
-  local have
-  have="$(sudo ghc-pkg --package-db="$GHC_PKGDB" list HUnit QuickCheck 2>/dev/null)"
   local need_hunit=1 need_qc=1
-  grep -qF "HUnit-${HUNIT_VER}" <<<"$have" && { echo "    HUnit ${HUNIT_VER} present."; need_hunit=0; }
-  grep -qF "QuickCheck-${QUICKCHECK_VER}" <<<"$have" && { echo "    QuickCheck ${QUICKCHECK_VER} present."; need_qc=0; }
+  grep -q "^package-id HUnit-${HUNIT_VER}-" "$GHC_ENV" 2>/dev/null \
+    && { echo "    HUnit ${HUNIT_VER} present."; need_hunit=0; }
+  grep -q "^package-id QuickCheck-${QUICKCHECK_VER}-" "$GHC_ENV" 2>/dev/null \
+    && { echo "    QuickCheck ${QUICKCHECK_VER} present."; need_qc=0; }
   (( need_hunit || need_qc )) || return 0
   cabal update
   if (( need_hunit )); then
