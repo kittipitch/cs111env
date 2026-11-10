@@ -90,6 +90,10 @@ STACK_VER="3.7.1"
 HLS_VER="2.14.0.0"
 HUNIT_VER="1.6.2.0"
 QUICKCHECK_VER="2.14.3"
+# QuickCheck/HUnit dependencies, frozen to the grader's exact set
+SPLITMIX_VER="0.1.3.2"
+RANDOM_VER="1.2.1.3"
+CALLSTACK_VER="0.4.0"
 ORMOLU_VER="0.7.2.0"
 BUN_VER="1.3.14"
 GHC_ENV="/usr/local/lib/ghc-${GHC_VER}/lib/ghc.env"
@@ -1228,7 +1232,7 @@ do_hunit() {
   cabal update
   if (( need_hunit )); then
     sudo -E cabal --store-dir=/usr/local/lib/ghc-${GHC_VER}/cabal-store install \
-      --lib "HUnit-${HUNIT_VER}" call-stack \
+      --lib "HUnit-${HUNIT_VER}" call-stack --constraint="call-stack ==${CALLSTACK_VER}" \
       --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
       --global --overwrite-policy=always --force-reinstalls || return 1
   fi
@@ -1238,6 +1242,7 @@ do_hunit() {
       --lib "QuickCheck-${QUICKCHECK_VER}" \
       --constraint='containers installed' --constraint='bytestring installed' \
       --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+      --constraint="splitmix ==${SPLITMIX_VER}" --constraint="random ==${RANDOM_VER}" \
       --package-db="$GHC_PKGDB" --package-env="$GHC_ENV" \
       --global --overwrite-policy=always || return 1
   fi

@@ -23,6 +23,10 @@ STACK_VER="3.7.1"
 HLS_VER="2.14.0.0"
 HUNIT_VER="1.6.2.0"
 QUICKCHECK_VER="2.14.3"
+# QuickCheck/HUnit dependencies, frozen to the grader's exact set
+SPLITMIX_VER="0.1.3.2"
+RANDOM_VER="1.2.1.3"
+CALLSTACK_VER="0.4.0"
 ORMOLU_VER="0.7.2.0"
 ORMOLU_RESOLVER="lts-22.44"
 BUN_VER="1.3.14"
@@ -189,11 +193,12 @@ do_haskell() {
   ghcup install stack "$STACK_VER" && ghcup set stack "$STACK_VER" || return 1
   ghcup install hls "$HLS_VER" && ghcup set hls "$HLS_VER" || return 1
   cabal update || return 1
-  cabal install --lib "HUnit-${HUNIT_VER}" --force-reinstalls
+  cabal install --lib "HUnit-${HUNIT_VER}" --constraint="call-stack ==${CALLSTACK_VER}" --force-reinstalls
   # QuickCheck: same version set as the grader (204115 property tests)
   cabal install --lib "QuickCheck-${QUICKCHECK_VER}" \
     --constraint='containers installed' --constraint='bytestring installed' \
     --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+    --constraint="splitmix ==${SPLITMIX_VER}" --constraint="random ==${RANDOM_VER}" \
     --force-reinstalls
 }
 
@@ -213,8 +218,12 @@ do_gcc_fix() {
   [[ "$gccid" == *"Apple clang"* ]] && { echo "    plain gcc is Apple clang; nothing to fix."; return 0; }
   echo "    PATH shadows clang with: $gccid — patching GHC settings."
   . "$HOME/.ghcup/env" 2>/dev/null
-  settings="$(ghc --print-libdir 2>/dev/null)/lib/settings"
-  [[ -f "$settings" ]] || { echo "    [FAIL] GHC settings file not found: $settings"; return 1; }
+  # libdir varies: ghcup installs end in /ghc-9.6.7 (settings next to it), bindists
+  # in /lib/ghc-9.6.7 (settings one level up). Try both, report which.
+  settings="$(ghc --print-libdir 2>/dev/null)/settings"
+  [[ -f "$settings" ]] || settings="$(ghc --print-libdir 2>/dev/null)/lib/settings"
+  [[ -f "$settings" ]] || { echo "    [FAIL] GHC settings file not found under $(ghc --print-libdir 2>/dev/null)"; return 1; }
+  echo "    settings file: $settings"
   sed 's/, "gcc")/, "clang")/g; s/, "g++")/, "clang++")/g' "$settings" > "$settings.tmp" || return 1
   cp -a "$settings" "$settings.bak_$(date +%s)"
   cat "$settings.tmp" > "$settings" && rm -f "$settings.tmp"

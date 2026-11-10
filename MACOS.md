@@ -427,10 +427,11 @@ It installs GHC, which is the Haskell compiler.
    ghcup install hls 2.14.0.0
    ghcup set hls 2.14.0.0
    cabal update
-   cabal install --lib HUnit-1.6.2.0 --force-reinstalls
+   cabal install --lib HUnit-1.6.2.0 --constraint='call-stack ==0.4.0' --force-reinstalls
    cabal install --lib QuickCheck-2.14.3 \
      --constraint='containers installed' --constraint='bytestring installed' \
      --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+     --constraint='splitmix ==0.1.3.2' --constraint='random ==1.2.1.3' \
      --force-reinstalls
    ```
 
