@@ -15,7 +15,7 @@
 | Level | Content | Platform |
 |-------|---------|----------|
 | **100-level** (CS111/CS115) | Python, Haskell | **Ubuntu** (native or dual-boot) or **macOS**; [Windows + WSL](#windows--wsl) only if you cannot dual-boot; or **[GitHub Codespaces](#browser-based-options)** |
-| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Bun, Docker | **Ubuntu** (native or dual-boot) or **macOS**; or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
+| **200-level** (CS203/CS212/CS252) | C/C++, Go, NodeJS, Bun, Docker + lazydocker | **Ubuntu** (native or dual-boot) or **macOS**; or **[GitHub Codespaces (C/C++)](#browser-based-options)** |
 
 ## Platform Guides
 
@@ -42,7 +42,7 @@ Native Ubuntu setup (dual-boot or native Linux). Supports all courses.
 
 - System update and basic tools
 - All programming languages (Python, Haskell, C/C++, Go, NodeJS, Bun)
-- Docker, fzf, GitHub CLI
+- Docker, lazydocker, fzf, GitHub CLI
 - Sublime Text and VSCode
 
 ### [macOS](MACOS.md)
