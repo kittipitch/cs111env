@@ -438,6 +438,22 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    - Select **Package Control: Install Package**
    - Search for and install **LSP**
 
+   > **Can't find LSP in the list?** It is probably already installed.
+   > `ubuntu_user_install.sh` and the lab machines ship a Package Control
+   > setting that installs LSP automatically the first time Sublime Text
+   > starts (restart Sublime once if it asks you to). **Install Package**
+   > hides packages that are already installed, so typing `LSP` shows only
+   > `LSP-...` add-ons:
+   >
+   > <img src="images/nix/img64_nix_sublime_install_package_lsp_absent.png" alt="Install Package hides installed LSP" width="600">
+   >
+   > Check with **Package Control: List Packages** instead. LSP should be listed:
+   >
+   > <img src="images/nix/img63_nix_sublime_list_packages_lsp.png" alt="List Packages shows LSP installed" width="600">
+   >
+   > If LSP is not in that list either, run **Package Control: Satisfy Packages**,
+   > then restart Sublime Text.
+
 4. Configure LSP for Haskell:
    - Open command palette again and select **Preferences: LSP Settings**
    - Add the following configuration:
@@ -513,6 +529,11 @@ This checks formatting and error messages inside Sublime Text.
    <img src="images/nix/img61_nix_haskell_lsp_verify.png" alt="Haskell LSP Verify" width="600">
 
 4. Add the `--` back and save the file. The error should disappear.
+5. Move your mouse over a function name such as `putStrLn`. LSP shows its type
+   and documentation. The status bar at the bottom should say
+   `LSP: haskell-language-server`.
+
+   <img src="images/nix/img65_nix_haskell_lsp_hover.png" alt="Haskell LSP hover" width="600">
 5. Run the file:
 
    ```bash
