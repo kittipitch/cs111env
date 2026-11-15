@@ -272,10 +272,12 @@ Terminus is the Sublime Text package that opens the terminal panel.
 
 <img src="images/common/img10_common_sublime_install_terminus.png" alt="Terminus 2" width="600">
 
-#### 14.4 Satisfy Dependencies
+#### 14.4 Satisfy Libraries
 
 - **Ctrl + Shift + P**
-- Type "**Package Control: Satisfy Dependencies**" and hit Enter
+- Type "**Package Control: Satisfy Libraries**" and hit Enter
+
+> Older guides call this **Satisfy Dependencies**. Package Control 4 renamed it; the old name no longer exists.
 
 #### 14.5 Configure Terminus
 
@@ -438,21 +440,23 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    - Select **Package Control: Install Package**
    - Search for and install **LSP**
 
-   > **Can't find LSP in the list?** It is probably already installed.
-   > `ubuntu_user_install.sh` and the lab machines ship a Package Control
-   > setting that installs LSP automatically the first time Sublime Text
-   > starts (restart Sublime once if it asks you to). **Install Package**
-   > hides packages that are already installed, so typing `LSP` shows only
-   > `LSP-...` add-ons:
+   > **Can't find LSP in the list?** **Install Package** hides packages that are
+   > already installed, so typing `LSP` shows only `LSP-...` add-ons. (Lab machines and
+   > `ubuntu_user_install.sh` install LSP for you.)
    >
    > <img src="images/nix/img64_nix_sublime_install_package_lsp_absent.png" alt="Install Package hides installed LSP" width="600">
    >
-   > Check with **Package Control: List Packages** instead. LSP should be listed:
+   > 1. **Ctrl + Shift + P** → **Package Control: List Packages**. If LSP is listed, it is
+   >    installed: go on to the next step.
    >
-   > <img src="images/nix/img63_nix_sublime_list_packages_lsp.png" alt="List Packages shows LSP installed" width="600">
+   >    <img src="images/nix/img63_nix_sublime_list_packages_lsp.png" alt="List Packages shows LSP installed" width="600">
    >
-   > If LSP is not in that list either, run **Package Control: Satisfy Packages**,
-   > then restart Sublime Text.
+   > 2. Not listed, or LSP never starts on a `.hs` file? Run **Package Control: Satisfy
+   >    Packages**, then **Package Control: Satisfy Libraries**, then restart Sublime Text.
+   >    Right after a Package Control upgrade it may say *"Dependencies have just been
+   >    migrated to python libraries. You may need to restart"*: restart, and restart once
+   >    more if needed, until the status bar shows `LSP: haskell-language-server` on a `.hs` file.
+   > 3. Still nothing? Open **View → Show Console** and send the red error lines to your TA.
 
 4. Configure LSP for Haskell:
    - Open command palette again and select **Preferences: LSP Settings**

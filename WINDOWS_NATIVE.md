@@ -341,7 +341,7 @@ Terminus adds a terminal inside Sublime Text.
 #### 13.1 Install Terminus
 
 - **Ctrl + Shift + P** → "Package Control: Install Package" → "Terminus"
-- **Ctrl + Shift + P** → "**Package Control: Satisfy Dependencies**"
+- **Ctrl + Shift + P** → "**Package Control: Satisfy Libraries**" (older guides: "Satisfy Dependencies", renamed in Package Control 4)
 
 <img src="images/common/img10_common_sublime_install_terminus.png" alt="Terminus" width="600">
 

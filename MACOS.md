@@ -324,10 +324,12 @@ Terminus adds a terminal inside Sublime Text. You can run commands without chang
 
 <img src="images/common/img05_common_sublime_install_package_control.png" alt="Terminus 1" width="600">
 
-#### 14.4 Satisfy Dependencies
+#### 14.4 Satisfy Libraries
 
-- **Ctrl + Shift + P**
-- Type "**Package Control: Satisfy Dependencies**" and hit Enter
+- **⌘ + Shift + P**
+- Type "**Package Control: Satisfy Libraries**" and hit Enter
+
+> Older guides call this **Satisfy Dependencies**. Package Control 4 renamed it; the old name no longer exists.
 
 #### 14.5 Configure Terminus
 
@@ -474,6 +476,24 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
    - Press **⌘ + Shift + P**
    - Select **Package Control: Install Package**
    - Search for and install **LSP**
+
+   > **Can't find LSP in the list?** **Install Package** hides packages that are
+   > already installed, so typing `LSP` shows only `LSP-...` add-ons. (Lab machines and
+   > `ubuntu_user_install.sh` install LSP for you.)
+   >
+   > <img src="images/nix/img64_nix_sublime_install_package_lsp_absent.png" alt="Install Package hides installed LSP" width="600">
+   >
+   > 1. **⌘ + Shift + P** → **Package Control: List Packages**. If LSP is listed, it is
+   >    installed: go on to the next step.
+   >
+   >    <img src="images/nix/img63_nix_sublime_list_packages_lsp.png" alt="List Packages shows LSP installed" width="600">
+   >
+   > 2. Not listed, or LSP never starts on a `.hs` file? Run **Package Control: Satisfy
+   >    Packages**, then **Package Control: Satisfy Libraries**, then restart Sublime Text.
+   >    Right after a Package Control upgrade it may say *"Dependencies have just been
+   >    migrated to python libraries. You may need to restart"*: restart, and restart once
+   >    more if needed, until the status bar shows `LSP: haskell-language-server` on a `.hs` file.
+   > 3. Still nothing? Open **View → Show Console** and send the red error lines to your TA.
 
 4. Configure LSP for Haskell:
    - Open command palette again and search for **LSP: Settings**
