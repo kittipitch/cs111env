@@ -343,6 +343,22 @@ fi
 # Source env for rest of script
 [[ -f "$HOME/.ghcup/env" ]] && source "$HOME/.ghcup/env"
 
+# Re-run safety: the bootstrap above only runs when ghcup is absent. A first run
+# killed mid-GHC leaves ghcup installed but GHC unset and cabal missing, so pin
+# both here every time (ghcup skips what is already installed).
+if command -v ghcup &> /dev/null; then
+  ghcup install ghc 9.6.7 && ghcup set ghc 9.6.7
+  # A killed unpack still counts as "installed" but ghc cannot load its libs.
+  # `ghcup install --force` then aborts on leftover files (GHCup-00140), so
+  # remove that one broken version dir first, as ghcup's error says to.
+  if ! ghc --numeric-version &> /dev/null; then
+    echo "==> GHC 9.6.7 is broken (interrupted install?), reinstalling it..."
+    rm -rf "$HOME/.ghcup/ghc/9.6.7"
+    ghcup install ghc --force 9.6.7 && ghcup set ghc 9.6.7
+  fi
+  ghcup install cabal 3.16.1.0 && ghcup set cabal 3.16.1.0
+fi
+
 echo "==> Verifying Haskell tools..."
 ghcup --version
 ghc --version
@@ -374,7 +390,11 @@ if command -v stack &> /dev/null; then
   stack install ormolu-0.7.2.0 --resolver lts-22.44 2>/dev/null || true
 fi
 # stack puts it in ~/.local/bin (on PATH via .bash_profile/.bashrc in new shells)
-"$HOME/.local/bin/ormolu" --version 2>/dev/null | head -1 || echo "WARNING: ormolu missing after install"
+if [ -x "$HOME/.local/bin/ormolu" ]; then
+  "$HOME/.local/bin/ormolu" --version | head -1
+else
+  echo "WARNING: ormolu missing after install (re-run the script)"
+fi
 
 # ============================================================
 # Git Configuration (UBUNTU.md Step 10)
@@ -403,6 +423,8 @@ sudo apt install -y curl gnupg ca-certificates
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 node -v && npm -v && npx -v
+# A NodeSource failure (proxy, captive portal) silently lands Ubuntu's nodejs 18 without npm.
+node -v 2>/dev/null | grep -q '^v24\.' || echo "WARNING: NodeJS is not v24 (NodeSource unreachable?); re-run the script"
 
 # ============================================================
 # Bun 1.3.14 (alongside NodeJS)
