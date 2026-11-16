@@ -186,6 +186,8 @@ sudo apt update && sudo apt install -y mypy
 
 SublimeLinter shows Python type errors inside Sublime Text.
 
+0. **First install Package Control** if it is not there yet: **Ctrl + Shift + P**, type
+   "Install Package Control" and hit Enter. (Without it, the commands below do not exist.)
 1. **Ctrl + Shift + P** → "Package Control: Add Repository"
 - Paste: `https://github.com/SublimeLinter/SublimeLinter`
 - Hit Enter
@@ -251,7 +253,7 @@ Terminus adds a terminal inside Sublime Text. You can run commands without chang
 #### 14.1 Install Package Control
 
 - **Ctrl + Shift + P**
-- Type "Install Package Control" and hit Enter
+- Type "Install Package Control" and hit Enter (skip if you already did this in the SublimeLinter step)
 
 #### 14.2 Add Package Control Channel (if needed)
 
@@ -538,7 +540,7 @@ This checks formatting and error messages inside Sublime Text.
    `LSP: haskell-language-server`.
 
    <img src="images/nix/img65_nix_haskell_lsp_hover.png" alt="Haskell LSP hover" width="600">
-5. Run the file:
+6. Run the file:
 
    ```bash
    runghc TestSetup.hs
@@ -663,7 +665,7 @@ npx -v
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads
 cd ~/Downloads
-wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip --no-check-certificate
+wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip
 unzip bun-linux-x64.zip
 sudo cp bun-linux-x64/bun /usr/local/bin/
 bun --version  # Should show 1.3.14

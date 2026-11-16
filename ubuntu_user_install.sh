@@ -412,7 +412,7 @@ if ! command -v bun &> /dev/null; then
   echo "==> Installing Bun 1.3.14..."
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
-  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip --no-check-certificate
+  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip
   unzip -q bun-linux-x64.zip
   sudo cp bun-linux-x64/bun /usr/local/bin/
   cd ~
@@ -427,7 +427,7 @@ echo "==> Installing Go 1.19.13..."
 if ! command -v go &> /dev/null; then
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
-  wget -q --no-check-certificate https://go.dev/dl/go1.19.13.linux-amd64.tar.gz
+  wget -q https://go.dev/dl/go1.19.13.linux-amd64.tar.gz
   sudo rm -rf /usr/local/go
   sudo tar -C /usr/local -xzf go1.19.13.linux-amd64.tar.gz
 

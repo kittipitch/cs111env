@@ -242,22 +242,24 @@ mypy --version
 
 SublimeLinter shows Python type errors inside Sublime Text.
 
-1. **Ctrl + Shift + P** → "Package Control: Add Repository"
+0. **First install Package Control** if it is not there yet: **⌘ + Shift + P**, type
+   "Install Package Control" and hit Enter. (Without it, the commands below do not exist.)
+1. **⌘ + Shift + P** → "Package Control: Add Repository"
 - Paste: `https://github.com/SublimeLinter/SublimeLinter`
 - Hit Enter
 
 2. **Add Repository** again but this time is for SublimeLinter-mypy
-- **Ctrl + Shift + P** → "Package Control: Add Repository"
+- **⌘ + Shift + P** → "Package Control: Add Repository"
 - Paste: `https://github.com/SublimeLinter/SublimeLinter-mypy`
 - Hit Enter
 
-3. **Ctrl + Shift + P** → "Package Control: Install Package"
+3. **⌘ + Shift + P** → "Package Control: Install Package"
 <img src="images/common/img05_common_sublime_install_package_control.png" alt="Sublime Linter 1" width="600">
 
 4. Type "SublimeLinter" and hit Enter.
 <img src="images/common/img32_common_sublime_install_linter.png" alt="Sublime Linter 3" width="600">
 
-5. **Ctrl + Shift + P** → "Package Control: Install Package"
+5. **⌘ + Shift + P** → "Package Control: Install Package"
 6. Type "SublimeLinter-mypy" and hit Enter.
 <img src="images/common/img33_common_sublime_install_linter_mypy.png" alt="Sublime Linter 4" width="600">
 
@@ -307,7 +309,7 @@ Terminus adds a terminal inside Sublime Text. You can run commands without chang
 #### 14.1 Install Package Control
 
 - **⌘ + Shift + P**
-- Type "Install Package Control" and hit Enter
+- Type "Install Package Control" and hit Enter (skip if you already did this in the SublimeLinter step)
 
 #### 14.2 Add Package Control Channel (if needed)
 

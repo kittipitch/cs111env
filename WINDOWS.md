@@ -170,7 +170,9 @@ wsl --version
 If `wsl --version` shows a version below 3.0, or the command is not found, run `wsl --update` again and
 restart Windows.
 
-**Note for Ryzen CPU users with integrated graphics:** If you have issues, use WSL version 1:
+**Note for Ryzen CPU users with integrated graphics:** If you have issues, use WSL version 1. WSL 1 has
+no systemd and ignores `.wslconfig`, so skip the `systemd=true` and `.wslconfig` parts of Step 7.5, and Docker
+will not run. Use it only if WSL 2 does not work:
 
 ```powershell
 # PowerShell
@@ -381,6 +383,16 @@ sudo apt install -y tar zip unzip git build-essential bash-completion xz-utils p
 sudo apt install -y --no-install-recommends emacs-nox
 ```
 
+#### 10.1 Configure Git (Global)
+
+Set your Git identity once, inside Ubuntu (WSL):
+
+```bash
+# Bash/WSL
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
+
 ### 11. Install basic dot files
 
 These settings make the terminal easier to use in this course.
@@ -463,6 +475,8 @@ sudo apt update && sudo apt install -y mypy
 
 SublimeLinter shows Python type errors inside Sublime Text.
 
+0. **First install Package Control** if it is not there yet: **Ctrl + Shift + P**, type
+   "Install Package Control" and hit Enter. (Without it, the commands below do not exist.)
 1. **Ctrl + Shift + P** → "Package Control: Add Repository"
 - Paste: `https://github.com/SublimeLinter/SublimeLinter`
 - Hit Enter
@@ -565,7 +579,7 @@ Terminus adds a terminal inside Sublime Text. You can run WSL commands without c
 #### 17.1 Install Package Control
 
 - **Ctrl + Shift + P**
-- Type "Install Package Control" and hit Enter
+- Type "Install Package Control" and hit Enter (skip if you already did this in the SublimeLinter step)
 
 #### 17.2 Add Package Control Channel (if needed)
 
