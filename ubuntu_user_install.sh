@@ -132,22 +132,165 @@ fi
 # Sublime Text (UBUNTU.md Step 8)
 # ============================================================
 
-echo "==> Installing Sublime Text 4..."
-sudo apt install -y apt-transport-https
-# Fetch key to a temp file; install ONLY if non-empty so a failed download
-# never writes an empty key (an empty key breaks every later apt update).
-SUBL_KEY="$(mktemp)"
-curl -fsSL --retry 3 https://download.sublimetext.com/sublimehq-pub.gpg | gpg --dearmor > "$SUBL_KEY" 2>/dev/null
-if [ -s "$SUBL_KEY" ]; then
-  sudo install -m644 "$SUBL_KEY" /etc/apt/trusted.gpg.d/sublimehq-archive.gpg
-  echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list > /dev/null
-  sudo apt update
-  sudo apt install -y sublime-text
+# WSL: students use Sublime Text on WINDOWS (WINDOWS.md §2, §16-17, §20), which reaches
+# mypy/HLS inside WSL. So on WSL skip the Linux Sublime and set up the Windows
+# one from here: Package Control 4.2.8 plus the WSL variants of the settings.
+setup_windows_sublime() {
+  local appdata userprofile st user_dir bin_dir bin_win ts f
+  appdata="$(cmd.exe /c 'echo %APPDATA%' 2>/dev/null | tr -d '\r')"
+  userprofile="$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')"
+  if [ -z "$appdata" ] || [ -z "$userprofile" ] || [ "$appdata" = "%APPDATA%" ]; then
+    echo "    WARNING: WSL interop unavailable (cmd.exe); set up Windows Sublime by hand (WINDOWS.md §16-20)."
+    return 0
+  fi
+  # same search as ubuntu_home .bashrc ("For Sublime Text & VSCODE on WSL"): C:/D: Program Files, then PATH
+  local subl_found="" dir exe
+  for dir in "/mnt/c/Program Files/Sublime Text" "/mnt/c/Program Files (x86)/Sublime Text" \
+             "/mnt/d/Program Files/Sublime Text" "/mnt/d/Program Files (x86)/Sublime Text"; do
+    for exe in subl.exe sublime_text.exe; do
+      [ -x "$dir/$exe" ] && { subl_found="$dir/$exe"; break 2; }
+    done
+  done
+  [ -n "$subl_found" ] || subl_found="$(command -v subl.exe || command -v sublime_text.exe || true)"
+  if [ -z "$subl_found" ]; then
+    echo "    Windows Sublime Text not found; trying winget..."
+    winget.exe install -e --id SublimeHQ.SublimeText.4 --accept-package-agreements --accept-source-agreements \
+      >/dev/null 2>&1 || echo "    WARNING: winget failed; install Sublime Text from sublimetext.com (WINDOWS.md §2)."
+  fi
+  st="$(wslpath -u "$appdata")/Sublime Text"
+  user_dir="$st/Packages/User"
+  ts="$(date +%s)"
+  # back up an existing config before touching it
+  [ -d "$user_dir" ] && cp -a "$user_dir" "$user_dir.bak_$ts" && echo "    backed up $user_dir.bak_$ts"
+  mkdir -p "$user_dir" "$st/Installed Packages"
+  if [ -f "$HOME/.config/sublime-text/Installed Packages/Package Control.sublime-package" ]; then
+    [ -f "$st/Installed Packages/Package Control.sublime-package" ] && \
+      cp -a "$st/Installed Packages/Package Control.sublime-package" "$st/Installed Packages/Package Control.sublime-package.bak_$ts"
+    cp "$HOME/.config/sublime-text/Installed Packages/Package Control.sublime-package" "$st/Installed Packages/"
+  fi
+  for f in "Package Control.sublime-settings" Preferences.sublime-settings Python.sublime-settings Haskell.sublime-settings; do
+    [ -f "$HOME/.config/sublime-text/Packages/User/$f" ] && cp "$HOME/.config/sublime-text/Packages/User/$f" "$user_dir/"
+  done
+
+  # mypy bridge (WINDOWS.md §16.3): Windows paths -> WSL paths, then wsl mypy
+  bin_dir="$(wslpath -u "$userprofile")/bin"
+  bin_win="$userprofile\\bin\\mypy-wsl.bat"
+  mkdir -p "$bin_dir"
+  sed 's/$/\r/' > "$bin_dir/mypy-wsl.bat" <<'BAT'
+@echo off
+setlocal enabledelayedexpansion
+
+set "final_args="
+
+:loop
+if "%~1"=="" goto :done
+set "arg=%~1"
+if "!arg:~1,2!"==":\" (
+    for /f "delims=" %%P in ('wsl wslpath "!arg!" 2^>nul') do (
+        set "final_args=!final_args! "%%P""
+    )
+) else (
+    set "final_args=!final_args! !arg!"
+)
+shift
+goto :loop
+
+:done
+wsl mypy %final_args%
+endlocal
+BAT
+
+  cat > "$user_dir/SublimeLinter.sublime-settings" <<EOF
+{
+  "linters": {
+    "mypy": {
+      "disable": false,
+      "executable": ["${bin_win//\\/\\\\}"],
+      "args": ["--ignore-missing-imports"]
+    }
+  }
+}
+EOF
+  cat > "$user_dir/LSP.sublime-settings" <<'EOF'
+{
+  "lsp_format_on_save": true,
+
+  "clients": {
+    "haskell-language-server": {
+      "enabled": true,
+      "command": [
+        "wsl",
+        "bash",
+        "-c",
+        "source ~/.ghcup/env && haskell-language-server-wrapper --lsp"
+      ],
+      "selector": "source.haskell",
+      "settings": {
+        "haskell.formattingProvider": "ormolu"
+      }
+    }
+  }
+}
+EOF
+  cat > "$user_dir/Terminus.sublime-settings" <<'EOF'
+{
+    "default_config": {
+        "linux": "Bash",
+        "osx": "Zsh",
+        "windows": "WSL"
+    },
+    "shell_configs": [
+        {
+            "name": "WSL",
+            "cmd": ["wsl.exe"],
+            "cwd": "${project_path:${folder}}",
+            "env": {},
+            "enable": true,
+            "default": true
+        }
+    ]
+}
+EOF
+  cat > "$user_dir/Default (Windows).sublime-keymap" <<'EOF'
+[
+  {
+    "keys": ["alt+`"],
+    "command": "toggle_terminus_panel",
+    "args": {
+      "config_name": "WSL"
+    }
+  }
+]
+EOF
+  # Sublime sends file:///C:/... ; HLS inside WSL resolves it as /C:/... (clementine 2026-11-13)
+  for d in /mnt/[a-z]; do
+    [ -d "$d" ] && sudo ln -sfn "$d" "/$(basename "$d" | tr a-z A-Z):"
+  done
+  echo "    Windows Sublime configured: $user_dir"
+  echo "    mypy bridge: $bin_win"
+}
+
+if [ "$IS_WSL" = true ]; then
+  echo "==> Configuring Windows Sublime Text for WSL..."
+  setup_windows_sublime
 else
-  echo "    WARNING: could not download Sublime key; skipping Sublime."
-  sudo rm -f /etc/apt/sources.list.d/sublime-text.list
+  echo "==> Installing Sublime Text 4..."
+  sudo apt install -y apt-transport-https
+  # Fetch key to a temp file; install ONLY if non-empty so a failed download
+  # never writes an empty key (an empty key breaks every later apt update).
+  SUBL_KEY="$(mktemp)"
+  curl -fsSL --retry 3 https://download.sublimetext.com/sublimehq-pub.gpg | gpg --dearmor > "$SUBL_KEY" 2>/dev/null
+  if [ -s "$SUBL_KEY" ]; then
+    sudo install -m644 "$SUBL_KEY" /etc/apt/trusted.gpg.d/sublimehq-archive.gpg
+    echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list > /dev/null
+    sudo apt update
+    sudo apt install -y sublime-text
+  else
+    echo "    WARNING: could not download Sublime key; skipping Sublime."
+    sudo rm -f /etc/apt/sources.list.d/sublime-text.list
+  fi
+  rm -f "$SUBL_KEY"
 fi
-rm -f "$SUBL_KEY"
 
 # ============================================================
 # Haskell Setup via GHCup (UBUNTU.md Step 15)
@@ -416,7 +559,13 @@ echo "==> Setup complete!"
 echo ""
 echo "Next steps:"
 echo "  1. Log out and back in for all PATH changes to take effect"
-echo "  2. For mypy in Sublime Text, see UBUNTU.md section 13"
-echo "  3. For Terminus in Sublime Text, see UBUNTU.md section 14"
-echo "  4. For Haskell LSP and Ormolu in Sublime Text, see UBUNTU.md section 16"
+if [ "$IS_WSL" = true ]; then
+  echo "  2. Windows Sublime Text is configured for WSL (mypy, Terminus, Haskell LSP)."
+  echo "     Start Sublime Text; Package Control installs LSP, SublimeLinter and Terminus on first start."
+  echo "     Restart it once or twice until a .hs file shows 'LSP: haskell-language-server' (WINDOWS.md section 20)."
+else
+  echo "  2. For mypy in Sublime Text, see UBUNTU.md section 13"
+  echo "  3. For Terminus in Sublime Text, see UBUNTU.md section 14"
+  echo "  4. For Haskell LSP and Ormolu in Sublime Text, see UBUNTU.md section 16"
+fi
 echo ""
