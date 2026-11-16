@@ -27,7 +27,8 @@ echo "==> Updating system..."
 sudo apt update && sudo apt upgrade -y
 
 echo "==> Setting timezone..."
-sudo timedatectl set-timezone Asia/Bangkok
+# timedatectl needs systemd; WSL without [boot] systemd=true has none -> set the link directly
+sudo timedatectl set-timezone Asia/Bangkok 2>/dev/null || sudo ln -sf /usr/share/zoneinfo/Asia/Bangkok /etc/localtime
 
 # ============================================================
 # Basic Tools (UBUNTU.md Step 2)
@@ -74,6 +75,14 @@ rm -rf /tmp/temp
 git clone --depth 1 -q https://github.com/kittipitch/ubuntu_home.git /tmp/temp 2>/dev/null || true
 if [ -d /tmp/temp ]; then
   cd /tmp/temp/
+  # Back up what is already there (a re-run or an existing WSL/Ubuntu home), never overwrite blind.
+  DOT_BAK="$HOME/.dotfiles_backup_$(date +%s)"
+  # .config: only the subfolders the dot files replace (the rest, e.g. browser profiles, stays put)
+  for item in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d \
+              $(cd .config 2>/dev/null && for d in *; do printf '.config/%s ' "$d"; done); do
+    [ -e "$HOME/$item" ] && mkdir -p "$DOT_BAK/$(dirname "$item")" && cp -a "$HOME/$item" "$DOT_BAK/$item" 2>/dev/null
+  done
+  [ -d "$DOT_BAK" ] && echo "    previous dot files backed up to $DOT_BAK"
   # Explicit list — skip .git, .gitignore, and .ghcup (user installs own GHCup).
   for item in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig \
               .byobu .config .emacs.d; do
@@ -266,6 +275,14 @@ EOF
   for d in /mnt/[a-z]; do
     [ -d "$d" ] && sudo ln -sfn "$d" "/$(basename "$d" | tr a-z A-Z):"
   done
+  # clementine 2026-11-13: Lib/ owned by SYSTEM/Administrators -> Sublime cannot import its libraries
+  if [ -d "$st/Lib" ] && ! touch "$st/Lib/.write_test" 2>/dev/null; then
+    echo "    WARNING: Sublime's Lib folder is not writable by you. In an ADMIN PowerShell run:"
+    echo "      takeown /f \"\$env:APPDATA\\Sublime Text\\Lib\" /r /d y"
+    echo "      icacls \"\$env:APPDATA\\Sublime Text\\Lib\" /grant \"\${env:USERNAME}:(OI)(CI)F\" /t"
+  else
+    rm -f "$st/Lib/.write_test"
+  fi
   echo "    Windows Sublime configured: $user_dir"
   echo "    mypy bridge: $bin_win"
 }
@@ -333,7 +350,6 @@ cabal --version
 # HLS drift is invisible without this: 2.13.0.0 has no noble bindist and a
 # silent fallback used to ship 2.14.x with no wrapper symlink at all.
 haskell-language-server-wrapper --version || echo "WARNING: HLS wrapper missing"
-ormolu --version || echo "WARNING: ormolu missing"
 
 echo "==> Installing stack, HUnit, and HLS..."
 ghcup install stack 3.7.1 2>/dev/null || true
@@ -357,6 +373,8 @@ if command -v stack &> /dev/null; then
   # Matches UBUNTU.md Step 16.1
   stack install ormolu-0.7.2.0 --resolver lts-22.44 2>/dev/null || true
 fi
+# stack puts it in ~/.local/bin (on PATH via .bash_profile/.bashrc in new shells)
+"$HOME/.local/bin/ormolu" --version 2>/dev/null | head -1 || echo "WARNING: ormolu missing after install"
 
 # ============================================================
 # Git Configuration (UBUNTU.md Step 10)
@@ -446,8 +464,12 @@ echo \
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker $USER
-sudo systemctl enable docker
-sudo systemctl start docker
+if [ -d /run/systemd/system ]; then
+  sudo systemctl enable docker
+  sudo systemctl start docker
+else
+  echo "    NOTE: no systemd here (WSL?): add '[boot]' 'systemd=true' to /etc/wsl.conf, run 'wsl --shutdown' in PowerShell, reopen Ubuntu; Docker then starts on its own."
+fi
 
 # ============================================================
 # lazydocker (Terminal UI for Docker)

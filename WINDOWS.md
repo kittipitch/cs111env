@@ -146,9 +146,9 @@ dism.exe /online /enable-feature `
 
 <img src="images/windows/img25_win_features_on_2.png" alt="Features on 2" width="600">
 
-#### 7.3 Download and install the Linux kernel update
+#### 7.3 Linux kernel
 
-WSL2 Linux kernel update package for x64 machines
+Nothing to download. `wsl --update` in the next step installs the current WSL and its Linux kernel.
 
 #### 7.4 Install WSL & Ubuntu 24.04
 
@@ -162,7 +162,13 @@ wsl --install --no-distribution
 
 # Set WSL 2 as default
 wsl --set-default-version 2
+
+# Check: the first line must say "WSL version: 3.0" or higher
+wsl --version
 ```
+
+If `wsl --version` shows a version below 3.0, or the command is not found, run `wsl --update` again and
+restart Windows.
 
 **Note for Ryzen CPU users with integrated graphics:** If you have issues, use WSL version 1:
 
@@ -348,6 +354,22 @@ Windows Terminal gives you a better terminal for Ubuntu than the default console
 
 ## Basic Tools
 
+> **Shortcut: one script for Steps 10–27.** Inside Ubuntu (WSL), run:
+>
+> ```bash
+> # Bash/WSL
+> curl -fsSL https://raw.githubusercontent.com/kittipitch/cs111env/main/ubuntu_user_install.sh -o ubuntu_user_install.sh
+> bash ubuntu_user_install.sh
+> ```
+>
+> It installs the Linux tools (Python, mypy, Haskell with the course versions, Java, Node, Docker and more)
+> and sets up **Sublime Text on Windows** for WSL: Package Control, the LSP, SublimeLinter (mypy) and Terminus
+> settings below, and the `mypy-wsl.bat` bridge in `C:\Users\<you>\bin\`. It backs up your old settings and
+> dot files first. It takes about an hour. Then start Sublime Text: Package Control installs LSP, SublimeLinter
+> and Terminus on the first start. Restart Sublime Text once or twice until a `.hs` file shows
+> `LSP: haskell-language-server` in the status bar ([Step 20](#20-configure-sublime-text-for-haskell)).
+> You still need Steps 1–9 (Windows side) first. The steps below are the same work done by hand.
+
 ### 10. Install basic tools
 
 These are common tools used by Python, Haskell, and command-line programs.
@@ -464,7 +486,7 @@ SublimeLinter shows Python type errors inside Sublime Text.
 
 SublimeLinter runs on Windows. It sends Windows paths such as `C:\project\foo.py` or `D:\project\foo.py`. But `mypy` runs inside WSL. This `.bat` file changes Windows paths into WSL paths before it runs `mypy`.
 
-Create a folder for the script (e.g. `C:\bin\` or `D:\bin\`) and save this as `mypy-wsl.bat`:
+Create a folder for the script (e.g. `C:\bin\` or `D:\bin\`) and save this as `mypy-wsl.bat`. (The one-click script in Step 10 puts it in `C:\Users\<you>\bin\` instead; either works if the SublimeLinter setting below points at it.)
 
 > **Note:** It is OK to put this file on the `C:\` drive. But if Windows is reinstalled, files on `C:\` may be lost. If you have a `D:\` drive, it is safer to keep your code and scripts there.
 
