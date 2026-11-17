@@ -105,8 +105,10 @@ cd ~/Downloads 2>/dev/null || cd ~/ && cd ~/Downloads
 wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip 2>/dev/null || true
 if [ -f IosevkaTerm.zip ]; then
   unzip -q IosevkaTerm.zip -d iosevka
+  # install (not cp): never prompts to replace, sets mode directly — no
+  # fchmod/timestamp errors when re-running over existing root-owned fonts
   sudo mkdir -p /usr/share/fonts/truetype/iosevka/
-  sudo cp iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
+  sudo install -m 644 iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
   sudo fc-cache -f -v 2>/dev/null || true
   # Set terminal font (may fail on non-GUI)
   dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'" 2>/dev/null || true
@@ -128,9 +130,13 @@ git clone -q https://github.com/tinted-theming/tinted-shell.git "$HOME"/.config/
 echo "==> Checking Python..."
 python3 --version
 
-echo "==> Installing uv"
-curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
+if command -v uv >/dev/null 2>&1; then
+    echo "uv already installed: $(uv --version)"
+else
+    echo "==> Installing uv"
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
 if [ ! -d "$HOME/.venv" ]; then
     uv venv ~/.venv
 else
