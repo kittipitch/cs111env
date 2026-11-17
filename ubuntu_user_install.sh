@@ -140,6 +140,7 @@ mkdir -p "$WORK_DIR"
 # download is never mistaken for a complete one on a re-run. Partials
 # are kept as <name>.part and resumed with wget -c.
 
+mkdir -p "$HOME/Downloads" 2>/dev/null
 CACHE="$HOME/Downloads/cs111_cache"
 mkdir -p "$CACHE" 2>/dev/null
 
