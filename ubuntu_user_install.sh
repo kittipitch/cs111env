@@ -133,6 +133,29 @@ WORK_DIR="$HOME/.cache/cs111_install"
 mkdir -p "$WORK_DIR"
 
 # ============================================================
+# Download cache (throttled-network friendly)
+# ============================================================
+# Big downloads are cached in ~/Downloads/cs111_cache. A file is only
+# published under its final name after wget exits 0, so a partial
+# download is never mistaken for a complete one on a re-run. Partials
+# are kept as <name>.part and resumed with wget -c.
+
+CACHE="$HOME/Downloads/cs111_cache"
+mkdir -p "$CACHE" 2>/dev/null
+
+fetch() {  # fetch <url> -> echoes path to cached file; empty on failure
+  local url="$1" f p
+  # hash the full URL into the key so a version bump in the URL can
+  # never be served a stale file that shares only the basename
+  f="$CACHE/$(printf %s "$url" | md5sum | cut -c1-8)-$(basename "${url%%\?*}")"
+  p="$f.part"
+  if [ ! -s "$f" ]; then
+    wget -c -q "$url" -O "$p" && mv "$p" "$f" || return 1
+  fi
+  echo "$f"
+}
+
+# ============================================================
 # System Setup
 # ============================================================
 
@@ -261,8 +284,8 @@ sudo apt install -y fonts-firacode 2>/dev/null || true
 # trigger unzip's "replace ...? [y]es, [n]o" prompt or fchmod errors.
 if ! fc-list 2>/dev/null | grep -qi "IosevkaTerm"; then
   IOS_TMP="$(mktemp -d)"
-  if wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip -O "$IOS_TMP/I.zip" \
-      && unzip -qo "$IOS_TMP/I.zip" -d "$IOS_TMP/i"; then
+  IOS_ZIP="$(fetch https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip)" || true
+  if [ -n "$IOS_ZIP" ] && unzip -qo "$IOS_ZIP" -d "$IOS_TMP/i"; then
     sudo mkdir -p /usr/share/fonts/truetype/iosevka/
     sudo install -m 644 "$IOS_TMP"/i/*.ttf /usr/share/fonts/truetype/iosevka/
     sudo fc-cache -f 2>/dev/null || true
@@ -503,7 +526,12 @@ if ! command -v ghcup &> /dev/null; then
   # Ensure we use the ghcup channel if requested (default is stable)
   export GHCUP_INSTALL_CHANNEL=ghcup
 
-  curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+  if [ -x "$HOME/.ghcup/bin/ghcup" ]; then
+    echo "    ghcup binary already present; skipping bootstrap download"
+    [ -f "$HOME/.ghcup/env" ] || printf 'export PATH="$HOME/.ghcup/bin:$PATH"\n' > "$HOME/.ghcup/env"
+  else
+    curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+  fi
 
   [[ -f "$HOME/.ghcup/env" ]] && source "$HOME/.ghcup/env"
 fi
@@ -641,8 +669,9 @@ if [ "$(bun --version 2>/dev/null)" != "1.3.14" ]; then
   cd "$WORK_DIR"
   # -O / unzip -o: a re-run after a half-finished install must not save
   # bun-linux-x64.zip.1 or stop at unzip's "replace ...?" prompt
-  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -O bun-linux-x64.zip \
-    && unzip -qo bun-linux-x64.zip \
+  BUN_ZIP="$(fetch https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip)" || true
+  [ -n "$BUN_ZIP" ] \
+    && unzip -qo "$BUN_ZIP" \
     && sudo install -m 0755 bun-linux-x64/bun /usr/local/bin/bun
   cd ~
 fi
@@ -657,10 +686,10 @@ echo "==> Installing Go 1.19.13..."
 # Check the install dir, not PATH: go lives in /usr/local/go/bin, which this
 # shell may not have yet, and a PATH-only check re-downloads it on every run.
 if ! /usr/local/go/bin/go version 2>/dev/null | grep -q 'go1\.19\.13'; then
-  cd "$WORK_DIR"
-  if wget -q https://go.dev/dl/go1.19.13.linux-amd64.tar.gz -O go1.19.13.linux-amd64.tar.gz; then
+  GO_TGZ="$(fetch https://go.dev/dl/go1.19.13.linux-amd64.tar.gz)" || true
+  if [ -n "$GO_TGZ" ]; then
     sudo rm -rf /usr/local/go
-    sudo tar -C /usr/local -xzf go1.19.13.linux-amd64.tar.gz
+    sudo tar -C /usr/local -xzf "$GO_TGZ"
   else
     echo "WARNING: Go download failed."
   fi
@@ -716,8 +745,9 @@ if ! command -v lazydocker &> /dev/null; then
   echo "==> Installing lazydocker..."
   cd "$WORK_DIR"
   LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-  curl -fsLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz" \
-    && tar xfz lazydocker.tar.gz lazydocker \
+  LD_TGZ="$(fetch "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz")" || true
+  [ -n "$LD_TGZ" ] \
+    && tar xfz "$LD_TGZ" lazydocker \
     && sudo install -m 0755 lazydocker /usr/local/bin/lazydocker \
     || echo "WARNING: lazydocker install failed (GitHub API rate limit?)."
   cd ~
@@ -740,10 +770,10 @@ fi
 if ! command -v clean &> /dev/null; then
   echo "==> Installing Clean language..."
   cd "$WORK_DIR"
-  wget -qO clean.tar.bz2 https://master.dl.sourceforge.net/project/clean/clean/3.4/clean-3.4.tar.bz2
+  CLEAN_TGZ="$(fetch https://master.dl.sourceforge.net/project/clean/clean/3.4/clean-3.4.tar.bz2)" || true
   # build only inside clean-3.4: a failed cd must not run make in $WORK_DIR
   # -std=gnu17: Clean 3.4 is old C; gcc 15 (Ubuntu 26.04) defaults to C23 and refuses it
-tar xf clean.tar.bz2 && cd clean-3.4 && make all CFLAGS="-O -std=gnu17" && sudo make install \
+[ -n "$CLEAN_TGZ" ] && tar xf "$CLEAN_TGZ" && cd clean-3.4 && make all CFLAGS="-O -std=gnu17" && sudo make install \
     || echo "WARNING: Clean build failed."
   cd ~
 fi
@@ -806,9 +836,9 @@ if want racket && ! command -v racket &> /dev/null; then
   echo "==> Installing Racket 8.12..."
   if [ ! -x /usr/racket/bin/racket ]; then
     [ -e /usr/racket ] && sudo mv /usr/racket "/usr/racket.bak_$(date +%s)"
-    cd "$WORK_DIR"
-    wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh -O racket-minimal-8.12-x86_64-linux-bc.sh \
-      && sudo sh ./racket-minimal-8.12-x86_64-linux-bc.sh --in-place --dest /usr/racket </dev/null
+    RACKET_SH="$(fetch https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh)" || true
+    [ -n "$RACKET_SH" ] \
+      && sudo sh "$RACKET_SH" --in-place --dest /usr/racket </dev/null
     cd ~
   fi
   [ -x /usr/racket/bin/racket ] && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
