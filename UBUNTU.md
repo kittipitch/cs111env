@@ -68,7 +68,8 @@ cd ~/Downloads
 wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip
 unzip IosevkaTerm.zip -d iosevka
 sudo mkdir -p /usr/share/fonts/truetype/iosevka/
-sudo cp iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
+# install (not cp): never prompts to replace on re-run, no fchmod/timestamp errors
+sudo install -m 644 iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
 sudo fc-cache -f -v
 dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'"
 dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/use-system-font false
