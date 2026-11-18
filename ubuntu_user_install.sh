@@ -13,6 +13,15 @@
 # ============================================================
 LAB_MACHINE=false
 
+# Per-user install: everything lands in $HOME. Run as root (sudo bash ...,
+# or a WSL distro whose default user is root) and it all goes to /root.
+if [ "$(id -u)" -eq 0 ] && [ "${ALLOW_ROOT:-}" != 1 ]; then
+    echo "ERROR: do not run this script as root or with sudo." >&2
+    echo "Run it as your normal user: bash ubuntu_user_install.sh (it calls sudo itself)." >&2
+    echo "WSL logged in as root? Create a user first: https://learn.microsoft.com/windows/wsl/setup/environment" >&2
+    exit 1
+fi
+
 # Check if running in WSL
 IS_WSL=false
 if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
@@ -101,7 +110,7 @@ echo "==> Installing programming fonts..."
 sudo apt install -y fonts-firacode 2>/dev/null || true
 
 # IosevkaTerm Nerd Font (optional, prettier)
-cd ~/Downloads 2>/dev/null || cd ~/ && cd ~/Downloads
+mkdir -p ~/Downloads && cd ~/Downloads
 wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip 2>/dev/null || true
 if [ -f IosevkaTerm.zip ]; then
   unzip -q IosevkaTerm.zip -d iosevka
