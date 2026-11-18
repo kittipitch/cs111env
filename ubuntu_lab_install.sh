@@ -1286,7 +1286,14 @@ do_hls() {
 # ============================================================
 # Other languages / tools
 # ============================================================
-do_java() { sudo apt install -y openjdk-21-jdk; }
+do_java() {
+  sudo apt install -y openjdk-21-jdk || return 1
+  # another JDK already on the box stays the default unless pointed at 21
+  local t
+  for t in java javac; do
+    sudo update-alternatives --set "$t" "/usr/lib/jvm/java-21-openjdk-amd64/bin/$t" >/dev/null || return 1
+  done
+}
 
 do_node() {
   command -v node &>/dev/null && node -v | grep -q '^v24\.' && { echo "    node already current."; return 0; }

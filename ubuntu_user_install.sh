@@ -224,10 +224,12 @@ if [ -d /tmp/temp ]; then
               $(cd .config 2>/dev/null && for d in *; do printf '.config/%s ' "$d"; done); do
     [ -e "$item" ] || continue
     if [ -e "$HOME/$item" ] || [ -L "$HOME/$item" ]; then
-      # cp -aL: back up the content, not the link (a symlinked ~/.bashrc
-      # would otherwise be "backed up" as a link to the file we overwrite)
+      # cp -aH: back up the content, not the link (a symlinked ~/.bashrc
+      # would otherwise be "backed up" as a link to the file we overwrite).
+      # -H, not -L: links INSIDE stay links; byobu leaves .ssh-agent links that
+      # dangle after a reboot, and -L fails on them.
       mkdir -p "$DOT_BAK/$(dirname "$item")" \
-        && cp -aL "$HOME/$item" "$DOT_BAK/$item" 2>/dev/null \
+        && cp -aH "$HOME/$item" "$DOT_BAK/$item" 2>/dev/null \
         || { echo "WARNING: could not back up ~/$item, left it alone"; continue; }
       # rm before cp: cp follows a pre-existing symlink and overwrites its target
       rm -rf "${HOME:?}/$item"
@@ -575,6 +577,17 @@ hs_pin 2.14.0.0 haskell-language-server-wrapper --version
 hs_pin 0.7.2.0  "$HOME/.local/bin/ormolu" --version
 HS_T="$(mktemp -d)"
 printf 'import Test.HUnit\nimport Test.QuickCheck\nmain :: IO ()\nmain = pure ()\n' > "$HS_T/T.hs"
+# The quiet installs above hide a failed download (seen: QuickCheck stopped at
+# "Downloading"); on a failed import try once more WITH the error output.
+if ! runghc "$HS_T/T.hs" 2>/dev/null; then
+  echo "==> HUnit/QuickCheck not importable, installing again (errors shown)..."
+  cabal install --lib HUnit-1.6.2.0 --constraint='call-stack ==0.4.0' --force-reinstalls
+  cabal install --lib QuickCheck-2.14.3 \
+    --constraint='containers installed' --constraint='bytestring installed' \
+    --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
+    --constraint='splitmix ==0.1.3.2' --constraint='random ==1.2.1.3' \
+    --force-reinstalls
+fi
 runghc "$HS_T/T.hs" 2>/dev/null && echo "    OK HUnit + QuickCheck import" \
   || echo "WARNING: HUnit/QuickCheck not importable (re-run the script)"
 rm -rf "$HS_T"
@@ -595,6 +608,12 @@ if want java; then
 
 echo "==> Installing OpenJDK 21..."
 sudo apt install -y openjdk-21-jdk
+# A box that already has another JDK (e.g. 25) keeps it as the default `java`;
+# point java/javac at 21, the grader's version.
+for t in java javac; do
+  [ -x "/usr/lib/jvm/java-21-openjdk-amd64/bin/$t" ] \
+    && sudo update-alternatives --set "$t" "/usr/lib/jvm/java-21-openjdk-amd64/bin/$t" >/dev/null
+done
 
 echo "==> Checking Java version..."
 java -version
@@ -606,7 +625,8 @@ fi  # want java
 
 echo "==> Installing NodeJS 24 LTS..."
 sudo apt install -y curl gnupg ca-certificates
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+# time limits: a stalled connection once hung here for 5 minutes, then fell back
+curl -fsSL --retry 3 --connect-timeout 30 --max-time 300 https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 node -v && npm -v && npx -v
 # A NodeSource failure (proxy, captive portal) silently lands Ubuntu's nodejs 18 without npm.
@@ -722,7 +742,9 @@ if ! command -v clean &> /dev/null; then
   cd "$WORK_DIR"
   wget -qO clean.tar.bz2 https://master.dl.sourceforge.net/project/clean/clean/3.4/clean-3.4.tar.bz2
   # build only inside clean-3.4: a failed cd must not run make in $WORK_DIR
-  tar xf clean.tar.bz2 && cd clean-3.4 && make all && sudo make install
+  # -std=gnu17: Clean 3.4 is old C; gcc 15 (Ubuntu 26.04) defaults to C23 and refuses it
+tar xf clean.tar.bz2 && cd clean-3.4 && make all CFLAGS="-O -std=gnu17" && sudo make install \
+    || echo "WARNING: Clean build failed."
   cd ~
 fi
 

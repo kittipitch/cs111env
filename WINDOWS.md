@@ -410,7 +410,7 @@ cd /tmp/temp/
 BAK=~/.dotfiles_backup_$(date +%s) && mkdir -p $BAK
 for f in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d; do
   [ -e /tmp/temp/$f ] || continue
-  [ -e ~/$f ] && { cp -aL ~/$f $BAK/ || continue; }
+  [ -e ~/$f ] && { cp -aH ~/$f $BAK/ || continue; }
   rm -rf ~/$f && cp -r /tmp/temp/$f ~/
 done
 mkdir -p ~/.config && cp -r /tmp/temp/.config/. ~/.config/

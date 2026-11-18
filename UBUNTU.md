@@ -57,7 +57,7 @@ cd /tmp/temp/
 BAK=~/.dotfiles_backup_$(date +%s) && mkdir -p $BAK
 for f in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d; do
   [ -e /tmp/temp/$f ] || continue
-  [ -e ~/$f ] && { cp -aL ~/$f $BAK/ || continue; }
+  [ -e ~/$f ] && { cp -aH ~/$f $BAK/ || continue; }
   rm -rf ~/$f && cp -r /tmp/temp/$f ~/
 done
 mkdir -p ~/.config && cp -r /tmp/temp/.config/. ~/.config/
@@ -803,7 +803,7 @@ cd ~/Downloads
 wget -O clean.tar.bz2 https://sourceforge.net/projects/clean/files/clean/3.4/clean-3.4.tar.bz2/download
 tar xvf clean.tar.bz2
 cd clean-3.4
-make all
+make all CFLAGS="-O -std=gnu17"
 sudo make install
 cd
 ```
