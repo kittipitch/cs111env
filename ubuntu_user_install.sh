@@ -28,6 +28,12 @@ if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
     IS_WSL=true
 fi
 
+# Downloads and builds happen here, never in ~/Downloads: on WSL that is a link
+# to the Windows Downloads folder (WINDOWS.md), where unzip/tar cannot set file
+# modes or times ("fchmod (file attributes) error: Operation not permitted").
+WORK_DIR="$HOME/.cache/cs111_install"
+mkdir -p "$WORK_DIR"
+
 # ============================================================
 # System Setup
 # ============================================================
@@ -111,6 +117,11 @@ fi
 # Programming Fonts (UBUNTU.md Step 4)
 # ============================================================
 
+if [ "$IS_WSL" = true ]; then
+  # Fonts inside WSL are never used: Windows Terminal and Sublime on Windows
+  # draw with Windows fonts (WINDOWS.md Step 4 installs them on Windows).
+  echo "==> Skipping programming fonts (WSL: install them on Windows, WINDOWS.md Step 4)"
+else
 echo "==> Installing programming fonts..."
 # FiraCode (simple option)
 sudo apt install -y fonts-firacode 2>/dev/null || true
@@ -118,7 +129,7 @@ sudo apt install -y fonts-firacode 2>/dev/null || true
 # IosevkaTerm Nerd Font (optional, prettier)
 # Re-run safe (same pattern as ubuntu_lab_install.sh do_fonts): skip when the
 # font is already installed; extract into a fresh temp dir with unzip -o, so a
-# leftover ~/Downloads/iosevka (root-owned from an earlier sudo run) can never
+# leftover ~/Downloads/iosevka (root-owned, or on a Windows drive) can never
 # trigger unzip's "replace ...? [y]es, [n]o" prompt or fchmod errors.
 if ! fc-list 2>/dev/null | grep -qi "IosevkaTerm"; then
   IOS_TMP="$(mktemp -d)"
@@ -136,6 +147,7 @@ fi
 dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'" 2>/dev/null || true
 dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/use-system-font false 2>/dev/null || true
 cd ~
+fi
 
 # ============================================================
 # Base16 Color Scheme (UBUNTU.md Step 5)
@@ -476,7 +488,7 @@ node -v 2>/dev/null | grep -q '^v24\.' || echo "WARNING: NodeJS is not v24 (Node
 
 if [ "$(bun --version 2>/dev/null)" != "1.3.14" ]; then
   echo "==> Installing Bun 1.3.14..."
-  mkdir -p ~/Downloads && cd ~/Downloads
+  cd "$WORK_DIR"
   # -O / unzip -o: a re-run after a half-finished install must not save
   # bun-linux-x64.zip.1 or stop at unzip's "replace ...?" prompt
   wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -O bun-linux-x64.zip \
@@ -494,7 +506,7 @@ echo "==> Installing Go 1.19.13..."
 # Check the install dir, not PATH: go lives in /usr/local/go/bin, which this
 # shell may not have yet, and a PATH-only check re-downloads it on every run.
 if ! /usr/local/go/bin/go version 2>/dev/null | grep -q 'go1\.19\.13'; then
-  mkdir -p ~/Downloads && cd ~/Downloads
+  cd "$WORK_DIR"
   if wget -q https://go.dev/dl/go1.19.13.linux-amd64.tar.gz -O go1.19.13.linux-amd64.tar.gz; then
     sudo rm -rf /usr/local/go
     sudo tar -C /usr/local -xzf go1.19.13.linux-amd64.tar.gz
@@ -550,8 +562,7 @@ fi
 
 if ! command -v lazydocker &> /dev/null; then
   echo "==> Installing lazydocker..."
-  [[ -d ~/Downloads ]] || mkdir ~/Downloads
-  cd ~/Downloads
+  cd "$WORK_DIR"
   LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
   curl -fsLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz" \
     && tar xfz lazydocker.tar.gz lazydocker \
@@ -576,10 +587,9 @@ fi
 
 if ! command -v clean &> /dev/null; then
   echo "==> Installing Clean language..."
-  [[ -d ~/Downloads ]] || mkdir ~/Downloads
-  cd ~/Downloads
+  cd "$WORK_DIR"
   wget -qO clean.tar.bz2 https://master.dl.sourceforge.net/project/clean/clean/3.4/clean-3.4.tar.bz2
-  # build only inside clean-3.4: a failed cd must not run make in ~/Downloads
+  # build only inside clean-3.4: a failed cd must not run make in $WORK_DIR
   tar xf clean.tar.bz2 && cd clean-3.4 && make all && sudo make install
   cd ~
 fi
@@ -636,7 +646,7 @@ if [ "$LAB_MACHINE" = true ]; then
   # links land in /usr/local/bin, so check PATH, not /usr/bin/racket (that
   # check never matched and re-ran the installer every time)
   if ! command -v racket &> /dev/null; then
-    mkdir -p ~/Downloads && cd ~/Downloads
+    cd "$WORK_DIR"
     wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh -O racket-minimal-8.12-x86_64-linux-bc.sh \
       && chmod +x racket-minimal-8.12-x86_64-linux-bc.sh \
       && sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh \

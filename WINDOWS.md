@@ -894,8 +894,8 @@ If you have VSCode installed on Windows, you can use it from WSL:
 **lazydocker** gives Docker a terminal screen. If you use Docker Desktop on Windows, this tool can connect to it.
 
 ```bash
-[[ -d ~/Downloads ]] || mkdir ~/Downloads
-cd ~/Downloads
+# work in /tmp: ~/Downloads is your Windows Downloads folder (Step 7)
+cd /tmp
 LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
 curl -sLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz"
 tar xfz lazydocker.tar.gz
