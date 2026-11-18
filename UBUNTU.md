@@ -21,7 +21,7 @@ This guide sets up native Ubuntu 24.04 for programming.
 - [NodeJS](#nodejs)
 - [Go](#go)
 - [Additional Tools](#additional-tools)
-- [Lab Languages (Optional)](#lab-languages-optional)
+- [Ruby, Prolog, Racket (Lab Languages)](#lab-languages-optional)
 - [Appendices](#appendices)
 
 ---
@@ -842,8 +842,8 @@ Verify:
 ruby --version
 ```
 
-On Ubuntu 24.04 this installs Ruby 3.2.3, matching the grader exactly
-(`ruby 3.2.3 (2024-01-18 revision 52bb2ac0a)`, verified on gdr111).
+On Ubuntu 24.04 this installs Ruby 3.2.3, matching the CS department's
+CMS grader exactly (`ruby 3.2.3 (2024-01-18 revision 52bb2ac0a)`).
 
 ### 31. Install SWI-Prolog (204315, 204271)
 
@@ -858,8 +858,16 @@ Verify:
 
 ```bash
 swipl --version
-# SWI-Prolog version 9.2.9 for x86_64-linux  <- grader version (gdr111)
+# SWI-Prolog version 9.2.9 for x86_64-linux  <- CS department CMS grader version
 ```
+
+> **Version note:** the grader runs **9.2.9**, but the stable PPA keeps
+> moving (it now ships 10.x) and the 9.2.9 packages are no longer
+> published there, so a fresh machine cannot install the grader-exact
+> version. Prolog coursework works fine on the newer PPA version; just
+> expect the `swipl --version` line above to differ. Ruby and Racket
+> freeze cleanly — Ruby because the Ubuntu 24.04 repo itself is pinned
+> at 3.2.3, Racket because it installs from a fixed release URL.
 
 ### 32. Install Racket 8.12 (minimal, BC) (204315)
 
