@@ -87,6 +87,6 @@ If you cannot install local tools:
 | CS111 | Python | **[GitHub Codespaces (CS111 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#basic-tools), [UBUNTU.md](UBUNTU.md#python), [MACOS.md](MACOS.md#python-312) |
 | 204101, 204217 | Python only | **[Windows (native, no WSL)](WINDOWS_NATIVE.md#python)** — Python-only guide (Python 3.12, mypy, Sublime Text/VS Code). CS111/CS115/CS255/CS212 use the other guides instead |
 | CS115 | Haskell | **[GitHub Codespaces (CS115 Template)](#browser-based-options)**, [WINDOWS.md](WINDOWS.md#haskell-setup), [UBUNTU.md](UBUNTU.md#haskell), [MACOS.md](MACOS.md#haskell) |
-| CS203 | Go, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages) |
-| CS212 | NodeJS, Bun, Docker | [UBUNTU.md](UBUNTU.md#nodejs--go), [MACOS.md](MACOS.md#other-languages) |
+| CS203 | Go, Docker | [UBUNTU.md](UBUNTU.md#go), [MACOS.md](MACOS.md#other-languages) |
+| CS212 | NodeJS, Bun, Docker | [UBUNTU.md](UBUNTU.md#nodejs), [MACOS.md](MACOS.md#other-languages) |
 | CS252 | C/C++ | **[GitHub Codespaces (C/C++ Template)](#browser-based-options)** |

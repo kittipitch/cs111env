@@ -18,8 +18,10 @@ This guide sets up native Ubuntu 24.04 for programming.
 - [Haskell](#haskell)
 - [Java](#java)
 - [C/C++](#cc)
-- [NodeJS & Go](#nodejs--go)
+- [NodeJS](#nodejs)
+- [Go](#go)
 - [Additional Tools](#additional-tools)
+- [Lab Languages (Optional)](#lab-languages-optional)
 - [Appendices](#appendices)
 
 ---
@@ -632,7 +634,7 @@ g++ -o hello hello.cpp
 
 ---
 
-## NodeJS & Go
+## NodeJS
 
 ### 21. NodeJS Setup
 
@@ -678,6 +680,8 @@ unzip -o bun-linux-x64.zip
 sudo cp bun-linux-x64/bun /usr/local/bin/
 bun --version  # Should show 1.3.14
 ```
+
+## Go
 
 ### 22. Go Setup
 
@@ -812,6 +816,63 @@ cd
 
 ```bash
 sudo apt update && sudo apt install -y gh
+```
+
+---
+
+## Lab Languages (Optional)
+
+These three languages are installed by the installer script only when
+`LAB_MACHINE=true` (lab machines). Follow these steps if you need them on a
+personal machine, e.g. for a course that uses them.
+
+### 30. Install Ruby
+
+```bash
+sudo apt update && sudo apt install -y ruby
+```
+
+Verify:
+
+```bash
+ruby --version
+```
+
+On Ubuntu 24.04 this installs Ruby 3.2.x, matching the grader.
+
+### 31. Install SWI-Prolog
+
+The Ubuntu repo version is old; the script uses the stable PPA.
+
+```bash
+sudo apt-add-repository -y ppa:swi-prolog/stable
+sudo apt update && sudo apt install -y swi-prolog
+```
+
+Verify:
+
+```bash
+swipl --version
+```
+
+### 32. Install Racket 8.12 (minimal, BC)
+
+```bash
+[[ -d ~/Downloads ]] || mkdir ~/Downloads
+cd ~/Downloads
+wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh
+chmod +x racket-minimal-8.12-x86_64-linux-bc.sh
+sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh
+sudo ln -s /usr/racket/bin/* /usr/local/bin/
+cd ~
+```
+
+Press Enter at the installer's prompts to accept the defaults (`/usr/racket`).
+
+Verify:
+
+```bash
+racket --version
 ```
 
 ---
