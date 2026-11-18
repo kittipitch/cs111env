@@ -875,6 +875,45 @@ Verify:
 racket --version
 ```
 
+### 33. Install Swift 6.1.2 (grader-only)
+
+Source: CMS grader "Supported Languages" doc. The toolchain MUST live under
+`/usr/local` — the grader sandbox cannot see it anywhere else (same reason as
+ghc and rustc).
+
+```bash
+[[ -d ~/Downloads ]] || mkdir ~/Downloads
+cd ~/Downloads
+wget --no-check-certificate https://download.swift.org/swift-6.1.2-release/ubuntu2404/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-ubuntu24.04.tar.gz
+tar xf swift-6.1.2-RELEASE-ubuntu24.04.tar.gz
+sudo rm -rf /usr/local/swift
+sudo mv swift-6.1.2-RELEASE-ubuntu24.04 /usr/local/swift
+sudo ln -sf /usr/local/swift/usr/bin/swiftc /usr/bin/swiftc
+sudo ln -sf /usr/local/swift/usr/bin/swift /usr/bin/swift
+cd ~
+```
+
+Verify:
+
+```bash
+swiftc --version
+# Swift version 6.1.2 (swift-6.1.2-RELEASE)
+# Target: x86_64-unknown-linux-gnu
+```
+
+Swift gotchas that matter for grading (from the same doc):
+
+- Top-level statements allowed in ONE file only, and it must be named
+  `main.swift`. A bare statement in any other file is a compile error
+  ("expressions are not allowed at the top level").
+- Do not `import Foundation` unless a task needs it: `readLine()` and
+  `print()` are in the standard library. On Ubuntu 24.04 a compile takes
+  ~0.5 s without Foundation vs ~1.5 s with it, and a cold-cache first
+  Foundation compile took 17 s — over the CMS 10 s compile limit.
+- Memory limit must be at least 16 MiB (32 MiB safe): a Swift binary has a
+  VmPeak of ~15.9 MiB; at 8 MiB it dies before `main` with
+  "failed to map segment from shared object".
+
 ---
 
 ## Appendices
