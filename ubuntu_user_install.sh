@@ -822,11 +822,35 @@ if want ruby && ! command -v ruby &> /dev/null; then
 fi
 
 # Prolog (SWI-Prolog)
-if want prolog && ! command -v swipl &> /dev/null; then
-  echo "==> Installing SWI-Prolog..."
-  sudo apt-add-repository -y ppa:swi-prolog/stable
-  sudo apt update
-  sudo apt -y install swi-prolog
+# SWI-Prolog 10.0.2 = lab boxes + CMS graders, frozen as debs in the cs111env
+# GitHub release (the PPA deletes superseded builds). The debs are built for
+# Ubuntu 24.04 (noble); other releases fall back to the PPA's current version.
+SWIPL_VER="10.0.2"
+SWIPL_DEB="10.0.2-1-gb8d8f931a-nobleppa2"
+if want prolog && ! swipl --version 2>/dev/null | grep -q "version ${SWIPL_VER} "; then
+  echo "==> Installing SWI-Prolog ${SWIPL_VER}..."
+  if [ "$(. /etc/os-release && echo "$VERSION_CODENAME")" = noble ]; then
+    PL_DIR="$(mktemp -d)"
+    PL_REL="https://github.com/kittipitch/cs111env/releases/download/swi-prolog-${SWIPL_VER}"
+    for f in "swi-prolog-nox_${SWIPL_DEB}_amd64.deb" "swi-prolog_${SWIPL_DEB}_amd64.deb" SHA256SUMS; do
+      curl -fsSL --retry 3 -o "$PL_DIR/$f" "$PL_REL/$f" || echo "WARNING: $f download failed."
+    done
+    if (cd "$PL_DIR" && sha256sum -c --quiet SHA256SUMS); then
+      chmod 755 "$PL_DIR" && chmod 644 "$PL_DIR"/*   # apt reads local debs as _apt
+      PL_RMX=""; dpkg -s swi-prolog-x &>/dev/null && PL_RMX="swi-prolog-x-"
+      (cd "$PL_DIR" && sudo apt-get install -y --allow-downgrades \
+        "./swi-prolog-nox_${SWIPL_DEB}_amd64.deb" "./swi-prolog_${SWIPL_DEB}_amd64.deb" $PL_RMX) \
+        && sudo apt-mark hold swi-prolog swi-prolog-nox
+    else
+      echo "WARNING: SWI-Prolog checksum check failed, not installed."
+    fi
+    rm -rf "$PL_DIR"
+  elif ! command -v swipl &> /dev/null; then
+    echo "    not Ubuntu 24.04: using the PPA's current version (differs from the grader)"
+    sudo apt-add-repository -y ppa:swi-prolog/stable
+    sudo apt update
+    sudo apt -y install swi-prolog
+  fi
 fi
 
 # Racket 8.12 BC (the grader's build). --in-place --dest: no questions asked.

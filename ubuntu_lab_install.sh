@@ -96,6 +96,8 @@ RANDOM_VER="1.2.1.3"
 CALLSTACK_VER="0.4.0"
 ORMOLU_VER="0.7.2.0"
 BUN_VER="1.3.14"
+SWIPL_VER="10.0.2"   # = lab boxes + CMS graders; debs in the cs111env GitHub release
+SWIPL_DEB="10.0.2-1-gb8d8f931a-nobleppa2"
 GHC_ENV="/usr/local/lib/ghc-${GHC_VER}/lib/ghc.env"
 GHC_PKGDB="/usr/local/lib/ghc-${GHC_VER}/lib/package.conf.d"
 CABAL_PKGDB="/usr/local/lib/ghc-${GHC_VER}/cabal-store/ghc-${GHC_VER}/package.db"
@@ -1463,8 +1465,23 @@ do_gh() {
 
 do_ruby()   { command -v ruby  &>/dev/null && return 0; sudo apt install -y ruby; }
 do_prolog() {
-  command -v swipl &>/dev/null && return 0
-  sudo apt-add-repository -y ppa:swi-prolog/stable && sudo apt update && sudo apt install -y swi-prolog
+  # Frozen at the grader/lab version from the cs111env GitHub release: the
+  # swi-prolog PPA keeps moving and deletes superseded builds.
+  swipl --version 2>/dev/null | grep -q "version ${SWIPL_VER} " && return 0
+  local rel="https://github.com/kittipitch/cs111env/releases/download/swi-prolog-${SWIPL_VER}"
+  local d f; d="$(mktemp -d)"
+  for f in "swi-prolog-nox_${SWIPL_DEB}_amd64.deb" "swi-prolog_${SWIPL_DEB}_amd64.deb" SHA256SUMS; do
+    fetch "$rel/$f" "$d/$f" || { echo "    WARNING: $f download failed."; rm -rf "$d"; return 1; }
+  done
+  (cd "$d" && sha256sum -c --quiet SHA256SUMS) || { echo "    WARNING: Prolog checksum mismatch."; rm -rf "$d"; return 1; }
+  chmod 755 "$d" && chmod 644 "$d"/*   # apt reads local debs as the _apt user
+  sudo apt-mark unhold swi-prolog swi-prolog-nox >/dev/null 2>&1
+  local rm_x=""; dpkg -s swi-prolog-x &>/dev/null && rm_x="swi-prolog-x-"
+  (cd "$d" && sudo apt-get install -y --allow-downgrades \
+     "./swi-prolog-nox_${SWIPL_DEB}_amd64.deb" "./swi-prolog_${SWIPL_DEB}_amd64.deb" $rm_x) \
+    || { rm -rf "$d"; return 1; }
+  sudo apt-mark hold swi-prolog swi-prolog-nox >/dev/null
+  rm -rf "$d"
 }
 do_racket() {
   command -v racket &>/dev/null && return 0
@@ -1615,7 +1632,7 @@ verify_install() {
   vopt  "FiraCode font"               bash -c 'fc-list | grep -qi fira'
   vopt  "Iosevka Nerd font"           bash -c 'fc-list | grep -qi iosevka'
   vopt  "ruby"                        ruby --version
-  vopt  "swipl (prolog)"             swipl --version
+  vopt  "swipl ${SWIPL_VER} (prolog)"   bash -c "swipl --version | grep -q 'version ${SWIPL_VER} '"
   vopt  "racket"                      racket --version
 
   echo ""

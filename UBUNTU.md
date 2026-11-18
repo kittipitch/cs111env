@@ -847,27 +847,38 @@ CMS grader exactly (`ruby 3.2.3 (2024-01-18 revision 52bb2ac0a)`).
 
 ### 31. Install SWI-Prolog (204315, 204271)
 
-The Ubuntu repo version is old; the script uses the stable PPA.
+SWI-Prolog **10.0.2** is the version on the lab machines and the CS
+department's CMS grader. The SWI-Prolog PPA keeps moving to newer versions
+and removes old ones, so 10.0.2 is kept as two `.deb` files in this
+guide's [GitHub release](https://github.com/kittipitch/cs111env/releases/tag/swi-prolog-10.0.2).
 
 ```bash
-sudo apt-add-repository -y ppa:swi-prolog/stable
-sudo apt update && sudo apt install -y swi-prolog
+cd ~/Downloads
+REL=https://github.com/kittipitch/cs111env/releases/download/swi-prolog-10.0.2
+wget $REL/swi-prolog-nox_10.0.2-1-gb8d8f931a-nobleppa2_amd64.deb
+wget $REL/swi-prolog_10.0.2-1-gb8d8f931a-nobleppa2_amd64.deb
+wget $REL/SHA256SUMS
+sha256sum -c SHA256SUMS
+sudo apt install -y ./swi-prolog-nox_10.0.2-1-gb8d8f931a-nobleppa2_amd64.deb ./swi-prolog_10.0.2-1-gb8d8f931a-nobleppa2_amd64.deb
+sudo apt-mark hold swi-prolog swi-prolog-nox
+cd ~
 ```
+
+`apt-mark hold` stops a later `apt upgrade` from replacing it. No internet
+on the machine? Copy the three files over on a USB drive and run the same
+`sha256sum` and `apt install` lines from that folder.
 
 Verify:
 
 ```bash
 swipl --version
-# SWI-Prolog version 9.2.9 for x86_64-linux  <- CS department CMS grader version
+# SWI-Prolog version 10.0.2 for x86_64-linux
 ```
 
-> **Version note:** the grader runs **9.2.9**, but the stable PPA keeps
-> moving (it now ships 10.x) and the 9.2.9 packages are no longer
-> published there, so a fresh machine cannot install the grader-exact
-> version. Prolog coursework works fine on the newer PPA version; just
-> expect the `swipl --version` line above to differ. Ruby and Racket
-> freeze cleanly — Ruby because the Ubuntu 24.04 repo itself is pinned
-> at 3.2.3, Racket because it installs from a fixed release URL.
+> These files are for **Ubuntu 24.04** only. On another Ubuntu release, use
+> the PPA instead (`sudo apt-add-repository -y ppa:swi-prolog/stable &&
+> sudo apt update && sudo apt install -y swi-prolog`); you get a newer
+> version than the grader's, which works for coursework.
 
 ### 32. Install Racket 8.12 (minimal, BC) (204315)
 
