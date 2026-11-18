@@ -1182,6 +1182,31 @@ do_ssh_restrict() {
   return 0
 }
 
+# Let the student account control NetworkManager (wifi) from the panel applet,
+# so a logged-in student physically at the console can add networks + type wifi
+# passwords without an admin password popup. Wifi stays a SYSTEM connection
+# (comes up at the greeter, keeps phoning home); this grants control only to a
+# local+active session of the student account.
+do_nm_polkit() {
+  echo "    Granting '$STUDENT_ACCOUNT' NetworkManager control (polkit)..."
+  sudo install -d -m 755 /etc/polkit-1/rules.d
+  sudo tee /etc/polkit-1/rules.d/49-nm-csmajor.rules >/dev/null <<RULE
+// Let the ${STUDENT_ACCOUNT} student account control NetworkManager (wifi) from
+// the panel applet. Wifi stays a SYSTEM connection (comes up at the greeter,
+// keeps phoning home); this only grants control to a ${STUDENT_ACCOUNT} session
+// physically at the console.
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 &&
+        subject.user === "${STUDENT_ACCOUNT}" && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});
+RULE
+  sudo chmod 644 /etc/polkit-1/rules.d/49-nm-csmajor.rules
+  sudo systemctl restart polkit 2>/dev/null || true
+  return 0
+}
+
 # ============================================================
 # Haskell — global install (shared by all users)
 # ============================================================
@@ -1656,6 +1681,7 @@ step "SWI-Prolog"                 do_prolog
 step "Racket"                     do_racket
 step "Restrict SSH to sudoer"     do_ssh_restrict
 only_on gnome "Firewall (SSH only)"        do_firewall
+only_on xfce  "NetworkManager polkit (student wifi)" do_nm_polkit
 
 [[ -n "${LAB_DRY_RUN:-}" ]] && exit 0
 verify_install
