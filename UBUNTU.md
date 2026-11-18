@@ -822,11 +822,15 @@ sudo apt update && sudo apt install -y gh
 
 ## Lab Languages (Optional)
 
-These three languages are installed by the installer script only when
+These languages are installed by the installer script only when
 `LAB_MACHINE=true` (lab machines). Follow these steps if you need them on a
-personal machine, e.g. for a course that uses them.
+personal machine, e.g. for a course that uses them:
 
-### 30. Install Ruby
+- **Ruby** — used by **204315**
+- **SWI-Prolog** — used by **204315** and **204271**
+- **Racket** — used by **204315** (Scheme)
+
+### 30. Install Ruby (204315)
 
 ```bash
 sudo apt update && sudo apt install -y ruby
@@ -838,9 +842,10 @@ Verify:
 ruby --version
 ```
 
-On Ubuntu 24.04 this installs Ruby 3.2.x, matching the grader.
+On Ubuntu 24.04 this installs Ruby 3.2.3, matching the grader exactly
+(`ruby 3.2.3 (2024-01-18 revision 52bb2ac0a)`, verified on gdr111).
 
-### 31. Install SWI-Prolog
+### 31. Install SWI-Prolog (204315, 204271)
 
 The Ubuntu repo version is old; the script uses the stable PPA.
 
@@ -853,9 +858,10 @@ Verify:
 
 ```bash
 swipl --version
+# SWI-Prolog version 9.2.9 for x86_64-linux  <- grader version (gdr111)
 ```
 
-### 32. Install Racket 8.12 (minimal, BC)
+### 32. Install Racket 8.12 (minimal, BC) (204315)
 
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads
