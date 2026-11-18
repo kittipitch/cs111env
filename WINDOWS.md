@@ -398,14 +398,18 @@ git config --global user.email "your.email@example.com"
 These settings make the terminal easier to use in this course.
 
 ```bash
+rm -rf /tmp/temp
 git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
 cd /tmp/temp/
-mv .bashrc ~/
-mv .bash_profile ~/
-mv .dircolors ~/
-mv .gitconfig ~/
-mv .emacs.d ~/
-mv .config ~/
+# Back up what you already have, then replace it (rm first: cp would
+# write through a file that is a link)
+BAK=~/.dotfiles_backup_$(date +%s) && mkdir -p $BAK
+for f in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d; do
+  [ -e /tmp/temp/$f ] || continue
+  [ -e ~/$f ] && { cp -aL ~/$f $BAK/ || continue; }
+  rm -rf ~/$f && cp -r /tmp/temp/$f ~/
+done
+mkdir -p ~/.config && cp -r /tmp/temp/.config/. ~/.config/
 source ~/.bash_profile
 source ~/.bashrc
 cd

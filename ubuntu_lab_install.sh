@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Ubuntu Lab Machine Setup Script
 # @Author: kk
 # @Date:   2026-04-06
@@ -643,21 +643,35 @@ do_extra_apps() {
   # eza: try Ubuntu repo, else the eza-community apt repo.
   if ! sudo apt install -y eza 2>/dev/null; then
     sudo install -d -m 755 /etc/apt/keyrings
-    curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-      | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg 2>/dev/null
-    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
-      | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
-    sudo apt update && sudo apt install -y eza
+    # temp file + non-empty guard + install: an empty key would leave an unsigned
+    # repo that breaks every apt update; gpg -o would prompt "overwrite?" on re-run
+    local k; k="$(mktemp)"
+    if curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor > "$k" 2>/dev/null \
+        && [[ -s "$k" ]]; then
+      sudo install -m 644 "$k" /etc/apt/keyrings/gierens.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+        | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null
+      sudo apt update && sudo apt install -y eza
+    else
+      echo "    WARNING: eza key download failed; eza skipped."
+    fi
+    rm -f "$k"
   fi
   dpkg -l exa >/dev/null 2>&1 && sudo apt purge -y exa 2>/dev/null || true  # superseded by eza
   # OnlyOffice
   if ! command -v onlyoffice-desktopeditors &>/dev/null; then
     sudo install -d -m 755 /etc/apt/keyrings
-    curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE \
-      | sudo gpg --dearmor -o /etc/apt/keyrings/onlyoffice.gpg 2>/dev/null
-    echo "deb [signed-by=/etc/apt/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" \
-      | sudo tee /etc/apt/sources.list.d/onlyoffice.list >/dev/null
-    sudo apt update && sudo apt install -y onlyoffice-desktopeditors
+    local k; k="$(mktemp)"
+    if curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --dearmor > "$k" 2>/dev/null \
+        && [[ -s "$k" ]]; then
+      sudo install -m 644 "$k" /etc/apt/keyrings/onlyoffice.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" \
+        | sudo tee /etc/apt/sources.list.d/onlyoffice.list >/dev/null
+      sudo apt update && sudo apt install -y onlyoffice-desktopeditors
+    else
+      echo "    WARNING: OnlyOffice key download failed; OnlyOffice skipped."
+    fi
+    rm -f "$k"
   fi
   return 0
 }
@@ -1294,7 +1308,8 @@ do_bun() {
 }
 
 do_go() {
-  command -v go &>/dev/null && { echo "    go already installed."; return 0; }
+  # version, not just presence: an apt golang or another Go must not pass
+  /usr/local/go/bin/go version 2>/dev/null | grep -qF go1.19.13 && { echo "    go already current."; return 0; }
   mkdir -p ~/Downloads; cd ~/Downloads || return 1
   fetch "https://go.dev/dl/go1.19.13.linux-amd64.tar.gz" go.tgz || {
     echo "    WARNING: Go download failed."; cd ~; return 1; }
@@ -1498,7 +1513,7 @@ verify_install() {
   vcrit "HLS typecheck a .hs file"    verify_hls_typecheck
   vcrit "HUnit importable"            sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.HUnit"
   vcrit "QuickCheck importable"        sudo ghc -package-db="$GHC_PKGDB" -package-env="$GHC_ENV" -e "import Test.QuickCheck"
-  vcrit "java"                        java -version
+  vver  "java"   'version "21.'       java -version
   vver  "node"     "v24."              node -v
   vcrit "npm"                         npm -v
   vcrit "npx"                         npx -v
@@ -1510,7 +1525,7 @@ verify_install() {
 
   echo ""
   echo " VERIFICATION (OPTIONAL)"
-  vopt  "go"                          go version
+  vver  "go"     "go1.19.13"          /usr/local/go/bin/go version
   if [[ "$DESKTOP" == "gnome" ]]; then
     vcrit "docker"                    docker --version  # needed by course 204212
     vcrit "lazydocker"                lazydocker --version

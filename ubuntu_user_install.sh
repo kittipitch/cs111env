@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Ubuntu Setup Script for CS Department
 # @Author: kk
 # @Date:   2024-05-05 23:58:35
@@ -87,16 +87,22 @@ if [ -d /tmp/temp ]; then
   # Back up what is already there (a re-run or an existing WSL/Ubuntu home), never overwrite blind.
   DOT_BAK="$HOME/.dotfiles_backup_$(date +%s)"
   # .config: only the subfolders the dot files replace (the rest, e.g. browser profiles, stays put)
+  # Explicit list — skip .git, .gitignore, and .ghcup (user installs own GHCup).
   for item in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d \
               $(cd .config 2>/dev/null && for d in *; do printf '.config/%s ' "$d"; done); do
-    [ -e "$HOME/$item" ] && mkdir -p "$DOT_BAK/$(dirname "$item")" && cp -a "$HOME/$item" "$DOT_BAK/$item" 2>/dev/null
+    [ -e "$item" ] || continue
+    if [ -e "$HOME/$item" ] || [ -L "$HOME/$item" ]; then
+      # cp -aL: back up the content, not the link (a symlinked ~/.bashrc
+      # would otherwise be "backed up" as a link to the file we overwrite)
+      mkdir -p "$DOT_BAK/$(dirname "$item")" \
+        && cp -aL "$HOME/$item" "$DOT_BAK/$item" 2>/dev/null \
+        || { echo "WARNING: could not back up ~/$item, left it alone"; continue; }
+      # rm before cp: cp follows a pre-existing symlink and overwrites its target
+      rm -rf "${HOME:?}/$item"
+    fi
+    mkdir -p "$HOME/$(dirname "$item")" && cp -r "$item" "$HOME/$item"
   done
   [ -d "$DOT_BAK" ] && echo "    previous dot files backed up to $DOT_BAK"
-  # Explicit list — skip .git, .gitignore, and .ghcup (user installs own GHCup).
-  for item in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig \
-              .byobu .config .emacs.d; do
-    [ -e "$item" ] && cp -rf "$item" ~/ 2>/dev/null || true
-  done
   source ~/.bash_profile 2>/dev/null || true
   cd
 fi
@@ -110,19 +116,25 @@ echo "==> Installing programming fonts..."
 sudo apt install -y fonts-firacode 2>/dev/null || true
 
 # IosevkaTerm Nerd Font (optional, prettier)
-mkdir -p ~/Downloads && cd ~/Downloads
-wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip 2>/dev/null || true
-if [ -f IosevkaTerm.zip ]; then
-  unzip -q IosevkaTerm.zip -d iosevka
-  # install (not cp): never prompts to replace, sets mode directly — no
-  # fchmod/timestamp errors when re-running over existing root-owned fonts
-  sudo mkdir -p /usr/share/fonts/truetype/iosevka/
-  sudo install -m 644 iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
-  sudo fc-cache -f -v 2>/dev/null || true
-  # Set terminal font (may fail on non-GUI)
-  dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'" 2>/dev/null || true
-  dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/use-system-font false 2>/dev/null || true
+# Re-run safe (same pattern as ubuntu_lab_install.sh do_fonts): skip when the
+# font is already installed; extract into a fresh temp dir with unzip -o, so a
+# leftover ~/Downloads/iosevka (root-owned from an earlier sudo run) can never
+# trigger unzip's "replace ...? [y]es, [n]o" prompt or fchmod errors.
+if ! fc-list 2>/dev/null | grep -qi "IosevkaTerm"; then
+  IOS_TMP="$(mktemp -d)"
+  if wget -q https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip -O "$IOS_TMP/I.zip" \
+      && unzip -qo "$IOS_TMP/I.zip" -d "$IOS_TMP/i"; then
+    sudo mkdir -p /usr/share/fonts/truetype/iosevka/
+    sudo install -m 644 "$IOS_TMP"/i/*.ttf /usr/share/fonts/truetype/iosevka/
+    sudo fc-cache -f 2>/dev/null || true
+  else
+    echo "WARNING: IosevkaTerm download failed (FiraCode still installed)."
+  fi
+  rm -rf "$IOS_TMP"
 fi
+# Set terminal font (may fail on non-GUI)
+dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'" 2>/dev/null || true
+dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/use-system-font false 2>/dev/null || true
 cd ~
 
 # ============================================================
@@ -378,9 +390,6 @@ echo "==> Verifying Haskell tools..."
 ghcup --version
 ghc --version
 cabal --version
-# HLS drift is invisible without this: 2.13.0.0 has no noble bindist and a
-# silent fallback used to ship 2.14.x with no wrapper symlink at all.
-haskell-language-server-wrapper --version || echo "WARNING: HLS wrapper missing"
 
 echo "==> Installing stack, HUnit, and HLS..."
 ghcup install stack 3.7.1 2>/dev/null || true
@@ -410,6 +419,26 @@ if [ -x "$HOME/.local/bin/ormolu" ]; then
 else
   echo "WARNING: ormolu missing after install (re-run the script)"
 fi
+
+# The installs above hide their errors (2>/dev/null || true), so check every
+# pin here: a wrong version must print, not hide. HLS drift used to be
+# invisible: 2.13.0.0 has no noble bindist and a silent fallback shipped
+# 2.14.x with no wrapper symlink at all.
+echo "==> Checking Haskell versions (UBUNTU.md / grader parity)..."
+hs_pin() {  # hs_pin <wanted> <command...>
+  local out; out="$("${@:2}" 2>&1 | head -1)"
+  case "$out" in *"$1"*) echo "    OK $1" ;; *) echo "WARNING: wanted $1, got: ${out:-missing}" ;; esac
+}
+hs_pin 9.6.7    ghc --version
+hs_pin 3.16.1.0 cabal --version
+hs_pin 3.7.1    stack --version
+hs_pin 2.14.0.0 haskell-language-server-wrapper --version
+hs_pin 0.7.2.0  "$HOME/.local/bin/ormolu" --version
+HS_T="$(mktemp -d)"
+printf 'import Test.HUnit\nimport Test.QuickCheck\nmain :: IO ()\nmain = pure ()\n' > "$HS_T/T.hs"
+runghc "$HS_T/T.hs" 2>/dev/null && echo "    OK HUnit + QuickCheck import" \
+  || echo "WARNING: HUnit/QuickCheck not importable (re-run the script)"
+rm -rf "$HS_T"
 
 # ============================================================
 # Git Configuration (UBUNTU.md Step 10)
@@ -445,13 +474,14 @@ node -v 2>/dev/null | grep -q '^v24\.' || echo "WARNING: NodeJS is not v24 (Node
 # Bun 1.3.14 (alongside NodeJS)
 # ============================================================
 
-if ! command -v bun &> /dev/null; then
+if [ "$(bun --version 2>/dev/null)" != "1.3.14" ]; then
   echo "==> Installing Bun 1.3.14..."
-  [[ -d ~/Downloads ]] || mkdir ~/Downloads
-  cd ~/Downloads
-  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip
-  unzip -q bun-linux-x64.zip
-  sudo cp bun-linux-x64/bun /usr/local/bin/
+  mkdir -p ~/Downloads && cd ~/Downloads
+  # -O / unzip -o: a re-run after a half-finished install must not save
+  # bun-linux-x64.zip.1 or stop at unzip's "replace ...?" prompt
+  wget -q https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -O bun-linux-x64.zip \
+    && unzip -qo bun-linux-x64.zip \
+    && sudo install -m 0755 bun-linux-x64/bun /usr/local/bin/bun
   cd ~
 fi
 bun --version
@@ -461,19 +491,22 @@ bun --version
 # ============================================================
 
 echo "==> Installing Go 1.19.13..."
-if ! command -v go &> /dev/null; then
-  [[ -d ~/Downloads ]] || mkdir ~/Downloads
-  cd ~/Downloads
-  wget -q https://go.dev/dl/go1.19.13.linux-amd64.tar.gz
-  sudo rm -rf /usr/local/go
-  sudo tar -C /usr/local -xzf go1.19.13.linux-amd64.tar.gz
-
-  # Add to PATH (in .bashrc from dotfiles)
-  [[ -f ~/.bash_profile ]] || ln -s ~/.profile ~/.bash_profile
-  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile 2>/dev/null || true
-  source ~/.bash_profile 2>/dev/null || true
+# Check the install dir, not PATH: go lives in /usr/local/go/bin, which this
+# shell may not have yet, and a PATH-only check re-downloads it on every run.
+if ! /usr/local/go/bin/go version 2>/dev/null | grep -q 'go1\.19\.13'; then
+  mkdir -p ~/Downloads && cd ~/Downloads
+  if wget -q https://go.dev/dl/go1.19.13.linux-amd64.tar.gz -O go1.19.13.linux-amd64.tar.gz; then
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf go1.19.13.linux-amd64.tar.gz
+  else
+    echo "WARNING: Go download failed."
+  fi
   cd ~
 fi
+# Add to PATH once (in .bashrc from dotfiles)
+[[ -f ~/.bash_profile ]] || ln -s ~/.profile ~/.bash_profile
+grep -qs '/usr/local/go/bin' ~/.bash_profile || echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
+export PATH="$PATH:/usr/local/go/bin"
 
 echo "==> Checking Go version..."
 go version
@@ -488,18 +521,21 @@ sudo install -m 0755 -d /etc/apt/keyrings
 # "overwrite?" prompt when the key already exists.
 DOCKER_KEY="$(mktemp)"
 curl -fsSL --retry 3 https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor > "$DOCKER_KEY" 2>/dev/null
+# The repo list is written only with a good key: a list without its key is an
+# unsigned repo, and every later apt update fails.
 if [ -s "$DOCKER_KEY" ]; then
   sudo install -m644 "$DOCKER_KEY" /etc/apt/keyrings/docker.gpg
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt update
+  sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+else
+  echo "WARNING: Docker key download failed; Docker skipped (re-run the script)."
+  [ -s /etc/apt/keyrings/docker.gpg ] || sudo rm -f /etc/apt/sources.list.d/docker.list
 fi
 rm -f "$DOCKER_KEY"
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker $USER
 if [ -d /run/systemd/system ]; then
   sudo systemctl enable docker
@@ -517,9 +553,10 @@ if ! command -v lazydocker &> /dev/null; then
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
   LAZYDOCKER_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-  curl -sLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz"
-  tar xfz lazydocker.tar.gz
-  sudo mv lazydocker /usr/local/bin
+  curl -fsLo lazydocker.tar.gz "https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${LAZYDOCKER_VERSION}_Linux_x86_64.tar.gz" \
+    && tar xfz lazydocker.tar.gz lazydocker \
+    && sudo install -m 0755 lazydocker /usr/local/bin/lazydocker \
+    || echo "WARNING: lazydocker install failed (GitHub API rate limit?)."
   cd ~
 fi
 
@@ -542,10 +579,8 @@ if ! command -v clean &> /dev/null; then
   [[ -d ~/Downloads ]] || mkdir ~/Downloads
   cd ~/Downloads
   wget -qO clean.tar.bz2 https://master.dl.sourceforge.net/project/clean/clean/3.4/clean-3.4.tar.bz2
-  tar xvf clean.tar.bz2
-  cd clean-3.4
-  make all
-  sudo make install
+  # build only inside clean-3.4: a failed cd must not run make in ~/Downloads
+  tar xf clean.tar.bz2 && cd clean-3.4 && make all && sudo make install
   cd ~
 fi
 
@@ -598,13 +633,14 @@ if [ "$LAB_MACHINE" = true ]; then
   fi
 
   # Racket
-  if ! [[ -x "/usr/bin/racket" ]]; then
-    [[ -d ~/Downloads ]] || mkdir ~/Downloads
-    cd ~/Downloads
-    wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh
-    chmod +x racket-minimal-8.12-x86_64-linux-bc.sh
-    sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh
-    sudo ln -s /usr/racket/bin/* /usr/local/bin/
+  # links land in /usr/local/bin, so check PATH, not /usr/bin/racket (that
+  # check never matched and re-ran the installer every time)
+  if ! command -v racket &> /dev/null; then
+    mkdir -p ~/Downloads && cd ~/Downloads
+    wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh -O racket-minimal-8.12-x86_64-linux-bc.sh \
+      && chmod +x racket-minimal-8.12-x86_64-linux-bc.sh \
+      && sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh \
+      && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
     cd ~
   fi
 fi

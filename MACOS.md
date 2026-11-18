@@ -72,6 +72,7 @@ brew install git bash-completion tmux byobu coreutils pipx pipenv wget curl gnup
 These settings make the terminal easier to use in this course.
 
 ```bash
+rm -rf /tmp/temp
 git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
 cd /tmp/temp/
 # -n keeps a file you already have

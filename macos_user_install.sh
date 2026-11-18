@@ -193,7 +193,7 @@ do_haskell() {
   ghcup install stack "$STACK_VER" && ghcup set stack "$STACK_VER" || return 1
   ghcup install hls "$HLS_VER" && ghcup set hls "$HLS_VER" || return 1
   cabal update || return 1
-  cabal install --lib "HUnit-${HUNIT_VER}" --constraint="call-stack ==${CALLSTACK_VER}" --force-reinstalls
+  cabal install --lib "HUnit-${HUNIT_VER}" --constraint="call-stack ==${CALLSTACK_VER}" --force-reinstalls || return 1
   # QuickCheck: same version set as the grader (204115 property tests)
   cabal install --lib "QuickCheck-${QUICKCHECK_VER}" \
     --constraint='containers installed' --constraint='bytestring installed' \

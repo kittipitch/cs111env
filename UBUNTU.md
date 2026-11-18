@@ -46,14 +46,18 @@ sudo apt install -y --no-install-recommends emacs-nox
 These settings make the terminal easier to use in this course.
 
 ```bash
+rm -rf /tmp/temp
 git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
 cd /tmp/temp/
-mv .bashrc ~/
-mv .bash_profile ~/
-mv .dircolors ~/
-mv .gitconfig ~/
-mv .emacs.d ~/
-mv .config ~/
+# Back up what you already have, then replace it (rm first: cp would
+# write through a file that is a link)
+BAK=~/.dotfiles_backup_$(date +%s) && mkdir -p $BAK
+for f in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d; do
+  [ -e /tmp/temp/$f ] || continue
+  [ -e ~/$f ] && { cp -aL ~/$f $BAK/ || continue; }
+  rm -rf ~/$f && cp -r /tmp/temp/$f ~/
+done
+mkdir -p ~/.config && cp -r /tmp/temp/.config/. ~/.config/
 source ~/.bash_profile
 cd
 ```
@@ -64,11 +68,11 @@ cd
 # Install font manager
 sudo apt install fonts-firacode
 # Or optionally install IosevkaTerm Nerd Font
-cd ~/Downloads
-wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip
-unzip IosevkaTerm.zip -d iosevka
+mkdir -p ~/Downloads && cd ~/Downloads
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/IosevkaTerm.zip -O IosevkaTerm.zip
+# -o: overwrite without asking if you run this step a second time
+unzip -o IosevkaTerm.zip -d iosevka
 sudo mkdir -p /usr/share/fonts/truetype/iosevka/
-# install (not cp): never prompts to replace on re-run, no fchmod/timestamp errors
 sudo install -m 644 iosevka/*.ttf /usr/share/fonts/truetype/iosevka/
 sudo fc-cache -f -v
 dconf write /org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/font "'IosevkaTerm Nerd Font Mono 15'"
@@ -666,8 +670,8 @@ npx -v
 ```bash
 [[ -d ~/Downloads ]] || mkdir ~/Downloads
 cd ~/Downloads
-wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip
-unzip bun-linux-x64.zip
+wget https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip -O bun-linux-x64.zip
+unzip -o bun-linux-x64.zip
 sudo cp bun-linux-x64/bun /usr/local/bin/
 bun --version  # Should show 1.3.14
 ```
@@ -677,7 +681,7 @@ bun --version  # Should show 1.3.14
 **Download Go 1.19.13:**
 
 ```bash
-wget https://go.dev/dl/go1.19.13.linux-amd64.tar.gz
+wget https://go.dev/dl/go1.19.13.linux-amd64.tar.gz -O go1.19.13.linux-amd64.tar.gz
 ```
 
 **Remove old installations:**
@@ -738,7 +742,7 @@ go run hello.go
 ```bash
 # Add Docker repo
 sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 echo \
