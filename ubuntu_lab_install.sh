@@ -1207,6 +1207,38 @@ RULE
   return 0
 }
 
+# GNOME lab (class/exam) boxes: built-in wifi is OFF, always. Exam boxes must
+# have no path off the LAN, and a student must not be able to switch it back on.
+# Built-in = a wlan device NOT on USB (onboard/PCIe cards have no "/usb" in their
+# sysfs path); USB dongles are left alone so an admin can still plug one in on a
+# setup day. NetworkManager is told to ignore the device (nothing in the panel,
+# no polkit action can enable it) and its radio is soft-blocked at every boot.
+do_wifi_off() {
+  echo "    Turning built-in wifi off permanently (udev: NM unmanaged + rfkill)..."
+  sudo tee /etc/udev/rules.d/70-lab-builtin-wifi-off.rules >/dev/null <<'RULE'
+# cs111env lab install (gnome): built-in wifi off; USB wifi dongles untouched.
+SUBSYSTEM=="net", ACTION=="add", ENV{DEVTYPE}=="wlan", DEVPATH!="*/usb*", ENV{NM_UNMANAGED}="1", RUN+="/bin/sh -c 'for f in /sys/class/net/%k/phy80211/rfkill*/soft; do echo 1 > $$f; done; /usr/sbin/ip link set %k down'"
+RULE
+  sudo chmod 644 /etc/udev/rules.d/70-lab-builtin-wifi-off.rules
+  sudo udevadm control --reload
+  sudo udevadm trigger --subsystem-match=net --action=add
+  sudo udevadm settle 2>/dev/null || true
+  return 0
+}
+
+# true when every built-in (non-USB) wifi device is soft-blocked and NM-unmanaged
+builtin_wifi_off() {
+  local d p
+  for d in /sys/class/net/*; do
+    [[ -d "$d/phy80211" ]] || continue
+    p=$(readlink -f "$d")
+    [[ "$p" == */usb* ]] && continue
+    grep -qx 1 "$d"/phy80211/rfkill*/soft 2>/dev/null || return 1
+    nmcli -t -f DEVICE,STATE dev status 2>/dev/null | grep -qx "$(basename "$d"):unmanaged" || return 1
+  done
+  return 0
+}
+
 # ============================================================
 # Haskell — global install (shared by all users)
 # ============================================================
@@ -1593,6 +1625,7 @@ verify_install() {
       grep -Eq "^[[:space:]]*AutomaticLogin[[:space:]]*=[[:space:]]*${STUDENT_ACCOUNT}[[:space:]]*$" /etc/gdm3/custom.conf
     vcrit "Thai layout seen by ${STUDENT_ACCOUNT}" \
       bash -c "sudo -u '${STUDENT_ACCOUNT}' env HOME='${STUDENT_HOME}' gsettings get org.gnome.desktop.input-sources sources | grep -q \"'th'\""
+    vcrit "Built-in wifi off (rfkill + NM unmanaged)" builtin_wifi_off
   elif id student &>/dev/null; then
     echo "  [FAIL] legacy student account still exists"
     VFAIL=$((VFAIL+1))
@@ -1682,6 +1715,7 @@ step "Racket"                     do_racket
 step "Restrict SSH to sudoer"     do_ssh_restrict
 only_on gnome "Firewall (SSH only)"        do_firewall
 only_on xfce  "NetworkManager polkit (student wifi)" do_nm_polkit
+only_on gnome "Built-in wifi off"          do_wifi_off
 
 [[ -n "${LAB_DRY_RUN:-}" ]] && exit 0
 verify_install
