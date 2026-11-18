@@ -5,6 +5,9 @@ This guide sets up native Ubuntu 24.04 for programming.
 > **Note:** If you cannot install local tools, use the **[GitHub Codespaces (CS111 Fundamentals of Programming Template)](https://github.com/codespaces/new?hide_repo_select=true&repo=kittipitch/26cs111codespaces)**.
 
 > **Automated Setup:** You can run the **[ubuntu_user_install.sh](ubuntu_user_install.sh)** script to automate most of these steps.
+> It first asks which languages to install (arrow keys, **Space** to tick, **Enter** to start; Haskell is
+> ticked, Java, Go, Ruby, Racket and Prolog are optional). Skip the question with
+> `INSTALL=haskell,java bash ubuntu_user_install.sh` (or `INSTALL=all`).
 
 ## Table of Contents
 

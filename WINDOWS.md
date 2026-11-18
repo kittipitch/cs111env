@@ -364,7 +364,11 @@ Windows Terminal gives you a better terminal for Ubuntu than the default console
 > bash ubuntu_user_install.sh
 > ```
 >
-> It installs the Linux tools (Python, mypy, Haskell with the course versions, Java, Node, Docker and more)
+> First it asks which languages you want: move with the arrow keys, tick with **Space**, start with
+> **Enter** (only Haskell is ticked at first; Java, Go, Ruby, Racket and Prolog are optional).
+> To skip the question, run e.g. `INSTALL=haskell,java bash ubuntu_user_install.sh` (or `INSTALL=all`).
+>
+> It installs the Linux tools (Python, mypy, the languages you picked with the course versions, Node, Docker and more)
 > and sets up **Sublime Text on Windows** for WSL: Package Control, the LSP, SublimeLinter (mypy) and Terminus
 > settings below, and the `mypy-wsl.bat` bridge in `C:\Users\<you>\bin\`. It backs up your old settings and
 > dot files first. It takes about an hour. Then start Sublime Text: Package Control installs LSP, SublimeLinter

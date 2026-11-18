@@ -1404,11 +1404,15 @@ do_prolog() {
 }
 do_racket() {
   command -v racket &>/dev/null && return 0
+  # already unpacked, only the links missing: relink (the installer would abort)
+  [[ -x /usr/racket/bin/racket ]] && { sudo ln -sf /usr/racket/bin/* /usr/local/bin/; return; }
+  [[ -e /usr/racket ]] && sudo mv /usr/racket "/usr/racket.bak_$(date +%s)"
   mkdir -p ~/Downloads; cd ~/Downloads || return 1
   local inst="racket-minimal-8.12-x86_64-linux-bc.sh"
   fetch "https://download.racket-lang.org/releases/8.12/installers/${inst}" "$inst" || {
     echo "    WARNING: Racket download failed."; cd ~; return 1; }
-  chmod +x "$inst" && sudo bash "./$inst" && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
+  # --in-place --dest: no questions (plain `bash $inst` asked Unix-style vs in-place)
+  sudo sh "./$inst" --in-place --dest /usr/racket </dev/null && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
   local rc=$?; cd ~; return $rc
 }
 

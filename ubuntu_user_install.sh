@@ -8,8 +8,9 @@
 # This script follows the steps in UBUNTU.md for Ubuntu 24.04 setup
 
 # ============================================================
-# LAB_MACHINE: Set to true for lab machines (includes Ruby, Prolog, Racket)
-# Set to false for standard student setup (Python, Haskell, C/C++, Go, NodeJS, Docker)
+# LAB_MACHINE=true ticks every optional language in the menu below (Haskell,
+# Java, Go, Ruby, Racket, Prolog); false ticks only Haskell. The student can
+# still change the ticks, or skip the menu with INSTALL=... (see the menu).
 # ============================================================
 LAB_MACHINE=false
 
@@ -27,6 +28,103 @@ IS_WSL=false
 if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
     IS_WSL=true
 fi
+
+# --- language menu begin ---
+# Optional languages. Python/mypy/uv, Sublime, git, Node, Bun, Docker, Clean,
+# gh and the basic tools always install. Pick the rest:
+#   checkbox menu (arrow keys/j/k, space, a = all, Enter) on a terminal,
+#   y/N questions when TERM=dumb or MENU_STYLE=yn,
+#   INSTALL=haskell,java (or all / none) skips the menu for unattended runs.
+# No terminal and no INSTALL: the defaults below, without asking.
+LANGS=(haskell java go ruby racket prolog)
+declare -A LANG_LABEL=(
+  [haskell]="Haskell (GHC 9.6.7, cabal, stack, HLS, ormolu, HUnit, QuickCheck)"
+  [java]="Java (OpenJDK 21)"
+  [go]="Go 1.19.13"
+  [ruby]="Ruby"
+  [racket]="Racket 8.12 (Scheme)"
+  [prolog]="SWI-Prolog"
+)
+declare -A WANT=()
+want() { [ "${WANT[$1]:-0}" = 1 ]; }
+
+lang_defaults() {  # Haskell for CS115; a lab machine gets everything
+  local l
+  for l in "${LANGS[@]}"; do
+    if [ "${LAB_MACHINE:-false}" = true ] || [ "$l" = haskell ]; then WANT[$l]=1; else WANT[$l]=0; fi
+  done
+}
+
+lang_from_list() {  # lang_from_list "haskell,java" | all | none
+  local l item
+  for l in "${LANGS[@]}"; do WANT[$l]=0; done
+  case "$1" in
+    all) for l in "${LANGS[@]}"; do WANT[$l]=1; done; return 0 ;;
+    none|"") return 0 ;;
+  esac
+  for item in ${1//,/ }; do
+    [ -n "${LANG_LABEL[$item]+x}" ] || {
+      echo "ERROR: unknown INSTALL item '$item' (choose from: ${LANGS[*]}, all, none)" >&2; return 1; }
+    WANT[$item]=1
+  done
+}
+
+lang_draw() {
+  local i l
+  for i in "${!LANGS[@]}"; do
+    l=${LANGS[$i]}
+    printf '%s [%s] %s\033[K\n' "$([ "$i" = "$1" ] && echo '>' || echo ' ')" \
+      "$(want "$l" && echo x || echo ' ')" "${LANG_LABEL[$l]}" >&3
+  done
+}
+
+lang_checkbox() {  # keys from fd 4, screen on fd 3
+  local n=${#LANGS[@]} cur=0 key rest l all
+  printf '\nChoose languages to install (up/down move, space ticks, a = all, Enter = go):\n' >&3
+  lang_draw "$cur"
+  while IFS= read -rsn1 -u 4 key; do
+    case "$key" in
+      $'\e') IFS= read -rsn2 -t 0.1 -u 4 rest
+             case "$rest" in '[A') cur=$(( (cur+n-1) % n )) ;; '[B') cur=$(( (cur+1) % n )) ;; esac ;;
+      k) cur=$(( (cur+n-1) % n )) ;;
+      j) cur=$(( (cur+1) % n )) ;;
+      ' ') l=${LANGS[$cur]}; WANT[$l]=$(( 1 - WANT[$l] )) ;;
+      a) all=1; for l in "${LANGS[@]}"; do want "$l" || all=0; done
+         for l in "${LANGS[@]}"; do WANT[$l]=$(( 1 - all )); done ;;
+      ''|$'\r') break ;;
+    esac
+    printf '\033[%dA' "$n" >&3
+    lang_draw "$cur"
+  done
+}
+
+lang_yesno() {  # one question per language, answers from fd 4
+  local l ans
+  for l in "${LANGS[@]}"; do
+    printf 'Install %s? [%s] ' "${LANG_LABEL[$l]}" "$(want "$l" && echo Y/n || echo y/N)" >&3
+    IFS= read -r -u 4 ans || ans=""
+    case "$ans" in [yY]*) WANT[$l]=1 ;; [nN]*) WANT[$l]=0 ;; esac
+  done
+}
+
+choose_languages() {
+  local tty="${MENU_TTY:-/dev/tty}" l
+  lang_defaults
+  if [ -n "${INSTALL+x}" ]; then
+    lang_from_list "$INSTALL" || exit 2
+  elif ( : < "$tty" ) 2>/dev/null; then
+    exec 4< "$tty" 3> "${MENU_OUT:-$tty}"
+    if [ "${MENU_STYLE:-}" = yn ] || [ "${TERM:-dumb}" = dumb ]; then lang_yesno; else lang_checkbox; fi
+    exec 3>&- 4<&-
+  else
+    echo "    no terminal for the menu: using the defaults (set INSTALL=... to choose)"
+  fi
+  CHOSEN_LANGS=""
+  for l in "${LANGS[@]}"; do want "$l" && CHOSEN_LANGS="${CHOSEN_LANGS:+$CHOSEN_LANGS }$l"; done
+  echo "==> Optional languages: ${CHOSEN_LANGS:-none}"
+}
+# --- language menu end ---
+choose_languages
 
 # Downloads and builds happen here, never in ~/Downloads: on WSL that is a link
 # to the Windows Downloads folder (WINDOWS.md), where unzip/tar cannot set file
@@ -376,6 +474,7 @@ else
   rm -f "$SUBL_KEY"
 fi
 
+if want haskell; then
 # ============================================================
 # Haskell Setup via GHCup (UBUNTU.md Step 15)
 # ============================================================
@@ -479,6 +578,7 @@ printf 'import Test.HUnit\nimport Test.QuickCheck\nmain :: IO ()\nmain = pure ()
 runghc "$HS_T/T.hs" 2>/dev/null && echo "    OK HUnit + QuickCheck import" \
   || echo "WARNING: HUnit/QuickCheck not importable (re-run the script)"
 rm -rf "$HS_T"
+fi  # want haskell
 
 # ============================================================
 # Git Configuration (UBUNTU.md Step 10)
@@ -488,6 +588,7 @@ echo "==> Note: Remember to configure your Git identity later:"
 echo "    git config --global user.name \"Your Name\""
 echo "    git config --global user.email \"your.email@example.com\""
 
+if want java; then
 # ============================================================
 # Java Setup (UBUNTU.md Step 19)
 # ============================================================
@@ -497,6 +598,7 @@ sudo apt install -y openjdk-21-jdk
 
 echo "==> Checking Java version..."
 java -version
+fi  # want java
 
 # ============================================================
 # NodeJS Setup (UBUNTU.md Step 21)
@@ -526,6 +628,7 @@ if [ "$(bun --version 2>/dev/null)" != "1.3.14" ]; then
 fi
 bun --version
 
+if want go; then
 # ============================================================
 # Go Setup (UBUNTU.md Step 22)
 # ============================================================
@@ -550,6 +653,7 @@ export PATH="$PATH:/usr/local/go/bin"
 
 echo "==> Checking Go version..."
 go version
+fi  # want go
 
 # ============================================================
 # Docker Setup (UBUNTU.md Step 25)
@@ -655,35 +759,37 @@ if [ "$IS_WSL" = false ]; then
 fi
 
 # ============================================================
-# LAB MACHINE ONLY: Ruby, Prolog, Racket
+# Optional: Ruby, Prolog, Racket (picked in the menu at the start)
 # ============================================================
 
-if [ "$LAB_MACHINE" = true ]; then
-  echo "==> Installing lab machine languages (Ruby, Prolog, Racket)..."
+# Ruby
+if want ruby && ! command -v ruby &> /dev/null; then
+  echo "==> Installing Ruby..."
+  sudo apt -y install ruby
+fi
 
-  # Ruby
-  if ! [[ -x "/usr/bin/ruby" ]]; then
-    sudo apt -y install ruby
-  fi
+# Prolog (SWI-Prolog)
+if want prolog && ! command -v swipl &> /dev/null; then
+  echo "==> Installing SWI-Prolog..."
+  sudo apt-add-repository -y ppa:swi-prolog/stable
+  sudo apt update
+  sudo apt -y install swi-prolog
+fi
 
-  # Prolog (SWI-Prolog)
-  if ! [[ -x "/usr/bin/swipl" ]]; then
-    sudo apt-add-repository -y ppa:swi-prolog/stable
-    sudo apt update
-    sudo apt -y install swi-prolog
-  fi
-
-  # Racket
-  # links land in /usr/local/bin, so check PATH, not /usr/bin/racket (that
-  # check never matched and re-ran the installer every time)
-  if ! command -v racket &> /dev/null; then
+# Racket 8.12 BC (the grader's build). --in-place --dest: no questions asked.
+# The installer refuses an existing dest when it cannot ask ("exists, delete?
+# Aborting"), so relink an install that is already there, and move a broken
+# one aside first. Links land in /usr/local/bin, so check PATH.
+if want racket && ! command -v racket &> /dev/null; then
+  echo "==> Installing Racket 8.12..."
+  if [ ! -x /usr/racket/bin/racket ]; then
+    [ -e /usr/racket ] && sudo mv /usr/racket "/usr/racket.bak_$(date +%s)"
     cd "$WORK_DIR"
     wget -q https://download.racket-lang.org/releases/8.12/installers/racket-minimal-8.12-x86_64-linux-bc.sh -O racket-minimal-8.12-x86_64-linux-bc.sh \
-      && chmod +x racket-minimal-8.12-x86_64-linux-bc.sh \
-      && sudo bash ./racket-minimal-8.12-x86_64-linux-bc.sh \
-      && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
+      && sudo sh ./racket-minimal-8.12-x86_64-linux-bc.sh --in-place --dest /usr/racket </dev/null
     cd ~
   fi
+  [ -x /usr/racket/bin/racket ] && sudo ln -sf /usr/racket/bin/* /usr/local/bin/
 fi
 
 # ============================================================
