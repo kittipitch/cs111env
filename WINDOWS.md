@@ -370,7 +370,7 @@ Windows Terminal gives you a better terminal for Ubuntu than the default console
 >
 > It installs the Linux tools (Python, mypy, the languages you picked with the course versions, Node, Docker and more)
 > and sets up **Sublime Text on Windows** for WSL: Package Control, the LSP, SublimeLinter (mypy) and Terminus
-> settings below, and the `mypy-wsl.bat` bridge in `C:\Users\<you>\bin\`. It backs up your old settings and
+> settings below, and the `mypy-wsl.bat` bridge in `C:\Users\<you>\bin`. It backs up your old settings and
 > dot files first. It takes about an hour. Then start Sublime Text: Package Control installs LSP, SublimeLinter
 > and Terminus on the first start. Restart Sublime Text once or twice until a `.hs` file shows
 > `LSP: haskell-language-server` in the status bar ([Step 20](#20-configure-sublime-text-for-haskell)).
@@ -399,61 +399,24 @@ git config --global user.email "your.email@example.com"
 
 ### 11. Install basic dot files
 
-These settings make the terminal easier to use in this course.
-
-```bash
-rm -rf /tmp/temp
-git clone --depth 1 https://github.com/kittipitch/ubuntu_home.git /tmp/temp
-cd /tmp/temp/
-# Back up what you already have, then replace it (rm first: cp would
-# write through a file that is a link)
-BAK=~/.dotfiles_backup_$(date +%s) && mkdir -p $BAK
-for f in .bashrc .bash_profile .bash_aliases .dircolors .gitconfig .byobu .emacs.d; do
-  [ -e /tmp/temp/$f ] || continue
-  [ -e ~/$f ] && { cp -aH ~/$f $BAK/ || continue; }
-  rm -rf ~/$f && cp -r /tmp/temp/$f ~/
-done
-mkdir -p ~/.config && cp -r /tmp/temp/.config/. ~/.config/
-source ~/.bash_profile
-source ~/.bashrc
-cd
-```
+> **Same as [UBUNTU.md Step 3](UBUNTU.md#3-install-basic-dot-files)** —
+> run that step inside your WSL terminal.
 
 ### 12. Check Python
 
-```bash
-python3 --version
-```
+> **Same as [UBUNTU.md Step 6](UBUNTU.md#6-check-python)**.
 
 ### 13. Install uv
 
-`uv` is a fast Python package manager.
-It helps install Python packages quickly and safely.
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.bash_profile
-```
+> **Same as [UBUNTU.md Step 7](UBUNTU.md#7-install-uv)**.
 
 ### 14. Install Base16 color scheme
 
-```bash
-git clone https://github.com/tinted-theming/tinted-shell.git "$HOME"/.config/tinted-shell
-```
+> **Same as [UBUNTU.md Step 5](UBUNTU.md#5-install-base16-color-scheme)**.
 
 ### 15. Test Python
 
-Create `hello.py`:
-
-```python
-print("Hello world!!")
-```
-
-Run:
-
-```bash
-python3 hello.py
-```
+> **Same as [UBUNTU.md Step 12](UBUNTU.md#12-test-python)**.
 
 ---
 
@@ -508,9 +471,9 @@ SublimeLinter shows Python type errors inside Sublime Text.
 
 SublimeLinter runs on Windows. It sends Windows paths such as `C:\project\foo.py` or `D:\project\foo.py`. But `mypy` runs inside WSL. This `.bat` file changes Windows paths into WSL paths before it runs `mypy`.
 
-Create a folder for the script (e.g. `C:\bin\` or `D:\bin\`) and save this as `mypy-wsl.bat`. (The one-click script in Step 10 puts it in `C:\Users\<you>\bin\` instead; either works if the SublimeLinter setting below points at it.)
+Create a folder for the script (e.g. `C:\bin` or `D:\bin`) and save this as `mypy-wsl.bat`. (The one-click script in Step 10 puts it in `C:\Users\<you>\bin` instead; either works if the SublimeLinter setting below points at it.)
 
-> **Note:** It is OK to put this file on the `C:\` drive. But if Windows is reinstalled, files on `C:\` may be lost. If you have a `D:\` drive, it is safer to keep your code and scripts there.
+> **Note:** It is OK to put this file on the `C:` drive. But if Windows is reinstalled, files on `C:` may be lost. If you have a `D:` drive, it is safer to keep your code and scripts there.
 
 ```bat
 @echo off
@@ -558,7 +521,7 @@ Go to **Preferences → Package Settings → SublimeLinter → Settings** and ad
 }
 ```
 
-> **Note:** Adjust the path `C:\\bin\\mypy-wsl.bat` to wherever you saved `mypy-wsl.bat` (e.g. `D:\\bin\\mypy-wsl.bat`). Use double backslashes (`\\`) in JSON.
+> **Note:** Adjust the path `C:\\bin\\mypy-wsl.bat` to wherever you saved `mypy-wsl.bat` (e.g. `D:\\bin\\mypy-wsl.bat`). Use double backslashes (`\`) in JSON.
 
 #### 16.5 Verify it works
 
@@ -687,60 +650,10 @@ If you are stuck in a terminal editor:
 
 ### 19. Haskell Setup via GHCup
 
-GHCup installs and manages Haskell tools.
-It installs GHC, which is the Haskell compiler.
+> **Same as [UBUNTU.md Step 15](UBUNTU.md#15-haskell-setup-via-ghcup)** — run
+> that step inside your WSL terminal. Answer the prompts the same way
+> (`g` for the base channel, `n` for pre-releases, `a`/`p` for PATH).
 
-1. Install dependencies:
-
-   ```bash
-   sudo apt install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev pkg-config
-   ```
-
-2. Open your terminal (WSL for Windows users) and run:
-
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-   ```
-
-3. During the installation, answer `y` (Yes) to most questions, except:
-   - **Base channel**: select `g` (GHCup maintained)
-   - **Pre-releases / Cross channel**: answer `n` (No)
-   - **PATH**: select `a` (Append) or `p` (Prepend)
-
-4. Once completed, load the new PATH:
-
-   ```bash
-   source ~/.bashrc
-   ```
-
-5. Verify the installation:
-
-   ```bash
-   ghcup --version
-   ghc --version
-   ```
-
-6. Install the course versions of `stack`, Haskell Language Server, and `HUnit`:
-
-   The autojudge uses fixed software versions. We install the same versions here so your computer behaves like the judge. `stack` builds Haskell packages. Haskell Language Server gives editor errors and hints. `HUnit` is used for Haskell tests.
-
-   ```bash
-   ghcup install ghc 9.6.7
-   ghcup set ghc 9.6.7
-   ghcup install cabal 3.16.1.0
-   ghcup set cabal 3.16.1.0
-   ghcup install stack 3.7.1
-   ghcup set stack 3.7.1
-   ghcup install hls 2.14.0.0
-   ghcup set hls 2.14.0.0
-   cabal update
-   cabal install --lib HUnit-1.6.2.0 --constraint='call-stack ==0.4.0' --force-reinstalls
-   cabal install --lib QuickCheck-2.14.3 \
-     --constraint='containers installed' --constraint='bytestring installed' \
-     --constraint='directory installed' --constraint='mtl installed' --constraint='stm installed' \
-     --constraint='splitmix ==0.1.3.2' --constraint='random ==1.2.1.3' \
-     --force-reinstalls
-   ```
 
 ### 20. Configure Sublime Text for Haskell
 
@@ -834,53 +747,14 @@ This setup is **mandatory** for CS115. It gives Sublime Text Haskell formatting 
 
 ### 21. Create and Run a Haskell File (Hello World)
 
-1. Create a `Hello.hs` file in Sublime Text:
-
-   This checks that GHC can run a simple Haskell program.
-
-   ```haskell
-   main :: IO ()
-   main = putStrLn "Hello Haskell!!"
-   ```
-
-2. Run the file in the terminal (WSL):
-
-   ```bash
-   runghc Hello.hs
-   ```
+> **Same as [UBUNTU.md Step 17](UBUNTU.md#17-create-and-run-a-haskell-file-hello-world)** —
+> run it inside your WSL terminal.
 
 ### 22. Verify Ormolu and LSP
 
-After the basic test works, create `TestSetup.hs` to test LSP.
-This checks formatting and error messages inside Sublime Text.
-
-1. Create a `TestSetup.hs` file in Sublime Text:
-
-   ```haskell
-   -- 1. Test LSP formatting (Ormolu):
-   --    Try to mess up indentation or remove spaces around '=',
-   --    then save the file. It should auto-format on save.
-   x = 1 + 2
-
-   -- Intentional type error to test LSP - uncomment
-   -- badValue :: Int
-   -- badValue = "this is not an int"
-
-   main :: IO ()
-   main = putStrLn "LSP is working!"
-   ```
-
-2. **Save the file** and check if it auto-formats.
-3. Remove the `--` before the `badValue` lines and save. You should see a red error underline or dot. Move your mouse over it to see the error message.
-
-   <img src="images/nix/img61_nix_haskell_lsp_verify.png" alt="Haskell LSP Verify" width="600">
-
-4. Add the `--` back and save the file. The error should disappear.
-5. Run the file in the terminal (WSL):
-
-   ```bash
-   runghc TestSetup.hs
-   ```
+> **Same as [UBUNTU.md Step 18](UBUNTU.md#18-verify-ormolu-and-lsp)** — run it in
+> WSL + Sublime Text on Windows. Everything in that step (Ormolu auto-format,
+> the red error underline, the hover type check) behaves the same here.
 
 ---
 

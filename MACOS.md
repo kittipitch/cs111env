@@ -687,6 +687,38 @@ Run:
 go run hello.go
 ```
 
+### 23.1 Ruby Setup
+
+```bash
+brew install ruby
+echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+ruby --version
+```
+
+> **Intel Mac:** use `/usr/local/opt/ruby/bin` in the `PATH` line instead.
+
+Homebrew's Ruby is newer than the grader's 3.2.x on Ubuntu — fine for
+coursework; for grader-exact parity use the Ubuntu guide.
+
+### 23.2 SWI-Prolog Setup
+
+```bash
+brew install swi-prolog
+swipl --version
+```
+
+### 23.3 Racket Setup
+
+```bash
+brew install racket
+racket --version
+```
+
+Homebrew installs the full Racket (the lab/grader uses the minimal BC
+build 8.12). Fine for coursework; for grader-exact parity use the
+Ubuntu guide.
+
 ---
 
 ## Additional Tools
