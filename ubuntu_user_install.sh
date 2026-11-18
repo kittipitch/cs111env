@@ -62,13 +62,17 @@ sudo apt install -y $PKGS
 sudo apt install -y --no-install-recommends emacs-nox
 
 # Clipboard helper used by the byobu copy bindings (~/.byobu/.tmux.conf).
-# Auto-detects Wayland (wl-copy) vs X11 (xsel/xclip) at runtime.
-if [ "$IS_WSL" = false ]; then
-  echo "==> Installing /usr/local/bin/tmux-clip ..."
-  sudo tee /usr/local/bin/tmux-clip >/dev/null <<'TMUXCLIP'
+# Auto-detects Wayland (wl-copy) vs X11 (xsel/xclip) at runtime; on WSL it hands
+# the text to the WINDOWS clipboard (clip.exe), the one students paste from.
+# The dot files install .byobu on WSL too, so the helper must exist there.
+echo "==> Installing /usr/local/bin/tmux-clip ..."
+sudo tee /usr/local/bin/tmux-clip >/dev/null <<'TMUXCLIP'
 #!/bin/sh
 # tmux-clip — copy stdin to the system clipboard, auto-detecting Wayland vs X11.
-if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
+if command -v clip.exe >/dev/null 2>&1; then
+    # WSL: clip.exe reads UTF-16LE; plain UTF-8 would garble Thai text
+    iconv -f UTF-8 -t UTF-16LE | clip.exe
+elif [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1; then
     exec wl-copy
 elif [ -n "$DISPLAY" ] && command -v xsel >/dev/null 2>&1; then
     exec xsel -i -b
@@ -78,7 +82,31 @@ else
     exec cat >/dev/null
 fi
 TMUXCLIP
-  sudo chmod 755 /usr/local/bin/tmux-clip
+sudo chmod 755 /usr/local/bin/tmux-clip
+
+# WSL: the dot files set git's merge tool to kdiff3, but KDiff3 is a Windows app
+# (WINDOWS.md Step 6). This wrapper runs the Windows one, turning Linux file
+# paths into Windows paths (git passes /home/... names).
+if [ "$IS_WSL" = true ]; then
+  echo "==> Installing /usr/local/bin/kdiff3 (runs Windows KDiff3)..."
+  sudo tee /usr/local/bin/kdiff3 >/dev/null <<'KDIFF3'
+#!/usr/bin/env bash
+# kdiff3 for git inside WSL: start the Windows KDiff3 with Windows paths.
+lad="$(cmd.exe /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r')"
+for exe in "/mnt/c/Program Files/KDiff3/bin/kdiff3.exe" "/mnt/c/Program Files/KDiff3/kdiff3.exe" \
+           "$( [ -n "$lad" ] && wslpath -u "$lad")/Programs/KDiff3/bin/kdiff3.exe"; do
+  [ -x "$exe" ] && break
+done
+[ -x "$exe" ] || { echo "kdiff3: Windows KDiff3 not found; install it (WINDOWS.md Step 6)" >&2; exit 1; }
+args=()
+for a in "$@"; do
+  # only real files: git also passes labels such as "file.txt (Base)"
+  [ -e "$a" ] && a="$(wslpath -w "$a")"
+  args+=("$a")
+done
+exec "$exe" "${args[@]}"
+KDIFF3
+  sudo chmod 755 /usr/local/bin/kdiff3
 fi
 
 # ============================================================
@@ -620,8 +648,11 @@ fi
 # Disable conflicting terminal shortcut (UBUNTU.md Step 14.7)
 # ============================================================
 
-echo "==> Disabling conflicting terminal shortcut..."
-gsettings set org.gnome.desktop.wm.keybindings switch-group "['<Super>Above_Tab']" 2>/dev/null || true
+# GNOME only: WSL has no desktop, and Windows Sublime's Alt+` is not taken
+if [ "$IS_WSL" = false ]; then
+  echo "==> Disabling conflicting terminal shortcut..."
+  gsettings set org.gnome.desktop.wm.keybindings switch-group "['<Super>Above_Tab']" 2>/dev/null || true
+fi
 
 # ============================================================
 # LAB MACHINE ONLY: Ruby, Prolog, Racket
@@ -663,7 +694,12 @@ echo ""
 echo "==> Setup complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Log out and back in for all PATH changes to take effect"
+if [ "$IS_WSL" = true ]; then
+  # WSL has no log out: PATH, the docker group and systemd need the VM restarted
+  echo "  1. Close Ubuntu, run 'wsl --shutdown' in PowerShell, then open Ubuntu again"
+else
+  echo "  1. Log out and back in for all PATH changes to take effect"
+fi
 if [ "$IS_WSL" = true ]; then
   echo "  2. Windows Sublime Text is configured for WSL (mypy, Terminus, Haskell LSP)."
   echo "     Start Sublime Text; Package Control installs LSP, SublimeLinter and Terminus on first start."
